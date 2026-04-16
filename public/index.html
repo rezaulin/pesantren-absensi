@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pesantren Absensi</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#2e7d32;--green-light:#4caf50;--green-dark:#1b5e20;--bg:#f5f5f5;--card:#fff;--text:#333;--red:#d32f2f;--orange:#f57c00;--blue:#1976d2}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:inherit;text-decoration:none}
+
+/* Login */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,var(--green-dark),var(--green))}
+.login-box{background:#fff;padding:2rem;border-radius:12px;width:90%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.login-box h1{color:var(--green);text-align:center;margin-bottom:.3rem;font-size:1.4rem}
+.login-box p{text-align:center;color:#888;margin-bottom:1.5rem;font-size:.85rem}
+.login-box input{width:100%;padding:.7rem;border:1px solid #ddd;border-radius:8px;margin-bottom:1rem;font-size:.95rem}
+.login-box input:focus{outline:none;border-color:var(--green)}
+.btn{padding:.7rem 1.2rem;border:none;border-radius:8px;cursor:pointer;font-size:.95rem;font-weight:600;width:100%}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover{background:var(--green-dark)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-sm{padding:.4rem .8rem;font-size:.8rem;width:auto}
+.btn-outline{background:transparent;border:1px solid var(--green);color:var(--green)}
+.btn-outline:hover{background:var(--green);color:#fff}
+
+/* App layout */
+.app{display:none}
+.app.active{display:block}
+.navbar{background:var(--green);color:#fff;padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.navbar h2{font-size:1rem}
+.navbar .user-info{font-size:.75rem;opacity:.9}
+.hamburger{background:none;border:none;color:#fff;font-size:1.5rem;cursor:pointer}
+.sidebar{position:fixed;left:-260px;top:0;width:260px;height:100%;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,.1);transition:.3s;z-index:200;overflow-y:auto}
+.sidebar.open{left:0}
+.sidebar-header{background:var(--green);color:#fff;padding:1rem;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.sidebar-header button{background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer}
+.sidebar ul{list-style:none}
+.sidebar li{border-bottom:1px solid #eee}
+.sidebar li a{display:flex;align-items:center;gap:.7rem;padding:.85rem 1rem;font-size:.9rem;color:var(--text)}
+.sidebar li a:hover,.sidebar li a.active{background:#e8f5e9;color:var(--green);font-weight:600}
+.sidebar .role-badge{margin:1rem;font-size:.75rem;padding:.3rem .6rem;background:var(--green);color:#fff;border-radius:4px;display:inline-block}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:150}
+.overlay.active{display:block}
+
+/* Content */
+.content{padding:1rem;padding-bottom:80px}
+.page{display:none}
+.page.active{display:block}
+.page-title{font-size:1.1rem;margin-bottom:1rem;color:var(--green-dark)}
+
+/* Cards */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.7rem;margin-bottom:1rem}
+.stat-card{background:#fff;padding:1rem;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center}
+.stat-card .num{font-size:1.6rem;font-weight:700;color:var(--green)}
+.stat-card .label{font-size:.75rem;color:#888;margin-top:.2rem}
+
+/* Table */
+.table-wrap{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{background:var(--green);color:#fff;padding:.6rem;text-align:left;white-space:nowrap}
+td{padding:.5rem .6rem;border-bottom:1px solid #eee}
+tr:hover{background:#f9f9f9}
+
+/* Forms */
+.form-group{margin-bottom:.8rem}
+.form-group label{display:block;font-size:.8rem;color:#666;margin-bottom:.3rem}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:.55rem;border:1px solid #ddd;border-radius:6px;font-size:.9rem}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--green)}
+.form-row{display:flex;gap:.7rem}
+.form-row .form-group{flex:1}
+
+/* Absensi */
+.absensi-grid{display:grid;grid-template-columns:1fr;gap:.5rem}
+.santri-row{display:flex;align-items:center;justify-content:space-between;background:#fff;padding:.6rem .8rem;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.santri-row .nama{font-weight:600;font-size:.9rem}
+.santri-row .kamar{font-size:.75rem;color:#888}
+.status-btns{display:flex;gap:.3rem}
+.status-btn{padding:.3rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.7rem;cursor:pointer;background:#fff;min-width:36px;text-align:center}
+.status-btn.active-H{background:#c8e6c9;border-color:var(--green);color:var(--green-dark)}
+.status-btn.active-I{background:#fff9c4;border-color:#f9a825;color:#f57f17}
+.status-btn.active-S{background:#bbdefb;border-color:#1976d2;color:#1565c0}
+.status-btn.active-A{background:#ffcdd2;border-color:#d32f2f;color:#c62828}
+
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center}
+.modal-bg.active{display:flex}
+.modal{background:#fff;border-radius:12px;padding:1.5rem;width:90%;max-width:400px;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:1rem;color:var(--green)}
+.modal .btn{margin-top:.5rem}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.7rem 1.5rem;border-radius:8px;font-size:.85rem;z-index:999;display:none}
+.toast.show{display:block;animation:fadeInOut 2.5s forwards}
+@keyframes fadeInOut{0%{opacity:0}10%{opacity:1}90%{opacity:1}100%{opacity:0}}
+
+/* Pengumuman */
+.announce-card{background:#fff;padding:1rem;border-radius:10px;margin-bottom:.7rem;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.announce-card h4{color:var(--green-dark)}
+.announce-card .meta{font-size:.75rem;color:#999;margin:.3rem 0}
+.announce-card p{font-size:.85rem;line-height:1.4}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.filter-bar select,.filter-bar input{padding:.45rem;border:1px solid #ddd;border-radius:6px;font-size:.85rem}
+
+/* Responsive */
+@media(min-width:600px){
+  .absensi-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginPage">
+  <div class="login-box">
+    <h1>🕌 Pesantren</h1>
+    <p>Sistem Absensi Santri</p>
+    <input type="text" id="loginUser" placeholder="Username" autofocus>
+    <input type="password" id="loginPass" placeholder="Password">
+    <button class="btn btn-primary" onclick="doLogin()">Masuk</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <!-- Navbar -->
+  <div class="navbar">
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+    <h2 id="pageTitle">Dashboard</h2>
+    <div class="user-info" id="userInfo"></div>
+  </div>
+
+  <!-- Overlay -->
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span>🕌 Pesantren</span>
+      <button onclick="toggleSidebar()">✕</button>
+    </div>
+    <div class="role-badge" id="roleBadge"></div>
+    <ul id="navList"></ul>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <h3 class="page-title">Dashboard</h3>
+      <div class="stats" id="statsContainer"></div>
+      <div id="announcePreview"></div>
+    </div>
+
+    <!-- Absensi -->
+    <div class="page" id="page-absensi">
+      <h3 class="page-title">Absensi Santri</h3>
+      <div class="filter-bar">
+        <select id="absensiKamar" onchange="loadAbsensi()"><option value="">Semua Kamar</option></select>
+        <input type="date" id="absensiTanggal">
+      </div>
+      <div class="absensi-grid" id="absensiGrid"></div>
+      <button class="btn btn-primary" style="margin-top:1rem" onclick="simpanAbsensi()">Simpan Absensi</button>
+    </div>
+
+    <!-- Santri -->
+    <div class="page" id="page-santri">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h3 class="page-title" style="margin:0">Data Santri</h3>
+        <button class="btn btn-primary btn-sm" onclick="showModal('santri')" id="btnTambahSantri">+ Tambah</button>
+      </div>
+      <div class="table-wrap"><table id="santriTable"><thead><tr><th>No</th><th>Nama</th><th>Kamar</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- Kamar -->
+    <div class="page" id="page-kamar">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h3 class="page-title" style="margin:0">Kelola Kamar</h3>
+        <button class="btn btn-primary btn-sm" onclick="showModal('kamar')">+ Tambah</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Kapasitas</th><th>Pengurus</th><th>Aksi</th></tr></thead><tbody id="kamarBody"></tbody></table></div>
+    </div>
+
+    <!-- Users -->
+    <div class="page" id="page-users">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h3 class="page-title" style="margin:0">Kelola Pengguna</h3>
+        <button class="btn btn-primary btn-sm" onclick="showModal('user')">+ Tambah</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Username</th><th>Role</th><th>Aksi</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+    </div>
+
+    <!-- Rekap -->
+    <div class="page" id="page-rekap">
+      <h3 class="page-title">Rekap Absensi</h3>
+      <div class="filter-bar">
+        <input type="date" id="rekapDari">
+        <input type="date" id="rekapSampai">
+        <select id="rekapKamar"><option value="">Semua Kamar</option></select>
+        <button class="btn btn-primary btn-sm" onclick="loadRekap()">Filter</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Santri</th><th>Kamar</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="rekapBody"></tbody></table></div>
+    </div>
+
+    <!-- Pengumuman -->
+    <div class="page" id="page-pengumuman">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h3 class="page-title" style="margin:0">Pengumuman</h3>
+        <button class="btn btn-primary btn-sm" onclick="showModal('announce')" id="btnTambahAnnounce">+ Buat</button>
+      </div>
+      <div id="announceList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals -->
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API='';
+let token=localStorage.getItem('token');
+let me=null;
+
+// ── Helpers ──
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show')}
+async function api(path,opts={}){
+  const res=await fetch(API+path,{...opts,headers:{'Content-Type':'application/json','Authorization':'Bearer '+(token||''),...(opts.headers||{})}});
+  if(res.status===401){logout();return}
+  return res.json();
+}
+function $(id){return document.getElementById(id)}
+
+// ── Auth ──
+async function doLogin(){
+  const u=$('loginUser').value.trim(),p=$('loginPass').value;
+  if(!u||!p)return toast('Isi username & password');
+  const res=await api('/api/login',{method:'POST',body:JSON.stringify({username:u,password:p})});
+  if(res.token){token=res.token;localStorage.setItem('token',token);initApp()}
+  else toast(res.message||'Login gagal');
+}
+function logout(){token=null;localStorage.removeItem('token');$('loginPage').style.display='flex';$('app').classList.remove('active')}
+
+// ── Init ──
+async function initApp(){
+  if(!token){logout();return}
+  me=await api('/api/me');
+  if(!me||!me.id){logout();return}
+  $('loginPage').style.display='none';
+  $('app').classList.add('active');
+  $('userInfo').textContent=me.nama+' ('+me.role+')';
+  $('roleBadge').textContent=me.role==='admin'?'👑 Admin':'📖 Ustadz';
+  buildNav();
+  loadDashboard();
+}
+
+function buildNav(){
+  const items=[
+    {id:'dashboard',icon:'📊',label:'Dashboard'},
+    {id:'absensi',icon:'✅',label:'Absensi'},
+  ];
+  if(me.role==='admin'){
+    items.push({id:'santri',icon:'👨‍🎓',label:'Data Santri'});
+    items.push({id:'kamar',icon:'🏠',label:'Kelola Kamar'});
+    items.push({id:'users',icon:'👥',label:'Kelola Pengguna'});
+    items.push({id:'rekap',icon:'📋',label:'Rekap Absensi'});
+    items.push({id:'pengumuman',icon:'📢',label:'Pengumuman'});
+  } else {
+    items.push({id:'santri',icon:'👨‍🎓',label:'Data Santri'});
+    items.push({id:'rekap',icon:'📋',label:'Rekap Absensi'});
+  }
+  items.push({id:'logout',icon:'🚪',label:'Keluar'});
+  $('navList').innerHTML=items.map(i=>`<li><a href="#" onclick="${i.id==='logout'?'logout();return false':'navigate(\''+i.id+'\');return false'}" id="nav-${i.id}">${i.icon} ${i.label}</a></li>`).join('');
+}
+
+// ── Navigation ──
+function navigate(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const el=$('page-'+page);
+  if(el)el.classList.add('active');
+  document.querySelectorAll('.sidebar li a').forEach(a=>a.classList.remove('active'));
+  const nav=$('nav-'+page);
+  if(nav)nav.classList.add('active');
+  $('pageTitle').textContent=$('nav-'+page)?.textContent?.trim()||page;
+  toggleSidebar(false);
+  // Load data
+  if(page==='dashboard')loadDashboard();
+  if(page==='absensi')loadAbsensi();
+  if(page==='santri')loadSantri();
+  if(page==='kamar')loadKamar();
+  if(page==='users')loadUsers();
+  if(page==='rekap')loadRekap();
+  if(page==='pengumuman')loadPengumuman();
+}
+
+function toggleSidebar(force){
+  const s=$('sidebar'),o=$('overlay');
+  if(force===false){s.classList.remove('open');o.classList.remove('active');return}
+  s.classList.toggle('open');o.classList.toggle('active');
+}
+
+// ── Dashboard ──
+async function loadDashboard(){
+  const d=await api('/api/dashboard');
+  if(!d)return;
+  $('statsContainer').innerHTML=`
+    <div class="stat-card"><div class="num">${d.totalSantri||0}</div><div class="label">Total Santri</div></div>
+    <div class="stat-card"><div class="num">${d.hadirHariIni||0}</div><div class="label">Hadir Hari Ini</div></div>
+    <div class="stat-card"><div class="num">${d.izinHariIni||0}</div><div class="label">Izin/Sakit</div></div>
+    <div class="stat-card"><div class="num">${d.alfaHariIni||0}</div><div class="label">Alfa</div></div>
+  `;
+  const ann=await api('/api/pengumuman');
+  if(ann&&ann.length){
+    $('announcePreview').innerHTML='<h4 style="margin:.8rem 0 .5rem">📢 Pengumuman Terbaru</h4>'+
+      ann.slice(0,3).map(a=>`<div class="announce-card"><h4>${a.judul}</h4><div class="meta">${a.created_at}</div><p>${a.isi}</p></div>`).join('');
+  }
+}
+
+// ── Absensi ──
+let absensiData={};
+async function loadAbsensi(){
+  const today=new Date().toISOString().slice(0,10);
+  if(!$('absensiTanggal').value)$('absensiTanggal').value=today;
+  const kamarId=$('absensiKamar').value;
+  const tanggal=$('absensiTanggal').value;
+  const [santri,existing]=await Promise.all([
+    api('/api/santri'+(kamarId?'?kamar_id='+kamarId:'')),
+    api('/api/absensi?tanggal='+tanggal+(kamarId?'&kamar_id='+kamarId:''))
+  ]);
+  if(!santri)return;
+  // Populate kamar filter
+  const kamar=await api('/api/kamar');
+  if(kamar&&$('absensiKamar').options.length<=1){
+    kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('absensiKamar').appendChild(o)});
+  }
+  // Build existing map
+  const existingMap={};
+  if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
+  absensiData={};
+  $('absensiGrid').innerHTML=santri.map((s,i)=>{
+    const ex=existingMap[s.id];
+    const st=ex?ex.status:'H';
+    absensiData[s.id]=st;
+    return `<div class="santri-row">
+      <div><div class="nama">${i+1}. ${s.nama}</div><div class="kamar">${s.kamar_nama||'-'}</div></div>
+      <div class="status-btns">
+        <div class="status-btn ${st==='H'?'active-H':''}" onclick="setStatus(${s.id},'H',this)">H</div>
+        <div class="status-btn ${st==='I'?'active-I':''}" onclick="setStatus(${s.id},'I',this)">I</div>
+        <div class="status-btn ${st==='S'?'active-S':''}" onclick="setStatus(${s.id},'S',this)">S</div>
+        <div class="status-btn ${st==='A'?'active-A':''}" onclick="setStatus(${s.id},'A',this)">A</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function setStatus(id,status,el){
+  absensiData[id]=status;
+  const row=el.parentElement;
+  row.querySelectorAll('.status-btn').forEach(b=>b.className='status-btn');
+  el.classList.add('active-'+status);
+}
+async function simpanAbsensi(){
+  const tanggal=$('absensiTanggal').value;
+  const items=Object.entries(absensiData).map(([sid,status])=>({santri_id:parseInt(sid),status,keterangan:''}));
+  if(!items.length)return toast('Tidak ada data');
+  const res=await api('/api/absensi/bulk',{method:'POST',body:JSON.stringify({tanggal,items})});
+  toast(res.message||'Absensi tersimpan');
+}
+
+// ── Santri CRUD ──
+async function loadSantri(){
+  const data=await api('/api/santri');
+  if(!data)return;
+  $('santriTable').querySelector('tbody').innerHTML=data.map((s,i)=>`<tr>
+    <td>${i+1}</td><td>${s.nama}</td><td>${s.kamar_nama||'-'}</td>
+    <td><span style="color:${s.status==='aktif'?'green':'red'}">${s.status}</span></td>
+    <td>${me.role==='admin'?`<button class="btn btn-outline btn-sm" onclick="editSantri(${s.id})">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus('santri',${s.id})">🗑️</button>`:''}</td>
+  </tr>`).join('');
+  // Hide add button for ustadz
+  if($('btnTambahSantri'))$('btnTambahSantri').style.display=me.role==='admin'?'':'none';
+}
+function editSantri(id){
+  api('/api/santri/'+id).then(s=>{
+    if(s)showModal('santri',s);
+  });
+}
+
+// ── Kamar CRUD ──
+async function loadKamar(){
+  const data=await api('/api/kamar');
+  if(!data)return;
+  $('kamarBody').innerHTML=data.map((k,i)=>`<tr>
+    <td>${i+1}</td><td>${k.nama}</td><td>${k.kapasitas}</td><td>${k.pengurus||'-'}</td>
+    <td><button class="btn btn-outline btn-sm" onclick="editKamar(${k.id})">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus('kamar',${k.id})">🗑️</button></td>
+  </tr>`).join('');
+}
+function editKamar(id){
+  api('/api/kamar').then(data=>{const k=data.find(x=>x.id===id);if(k)showModal('kamar',k)});
+}
+
+// ── Users CRUD ──
+async function loadUsers(){
+  const data=await api('/api/users');
+  if(!data)return;
+  $('usersBody').innerHTML=data.map((u,i)=>`<tr>
+    <td>${i+1}</td><td>${u.nama}</td><td>${u.username}</td><td>${u.role}</td>
+    <td>${u.id!==me.id?`<button class="btn btn-outline btn-sm" onclick="editUser(${u.id})">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus('users',${u.id})">🗑️</button>`:'<small>(kamu)</small>'}</td>
+  </tr>`).join('');
+}
+function editUser(id){
+  api('/api/users').then(data=>{const u=data.find(x=>x.id===id);if(u)showModal('user',u)});
+}
+
+// ── Rekap ──
+async function loadRekap(){
+  // Populate kamar filter
+  const kamar=await api('/api/kamar');
+  if(kamar&&$('rekapKamar').options.length<=1){
+    kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('rekapKamar').appendChild(o)});
+  }
+  const params=new URLSearchParams();
+  if($('rekapDari').value)params.set('dari',$('rekapDari').value);
+  if($('rekapSampai').value)params.set('sampai',$('rekapSampai').value);
+  if($('rekapKamar').value)params.set('kamar_id',$('rekapKamar').value);
+  const data=await api('/api/rekap?'+params);
+  if(!data)return;
+  const statusMap={H:'✅ Hadir',I:'📝 Izin',S:'🤒 Sakit',A:'❌ Alfa'};
+  $('rekapBody').innerHTML=data.map(r=>`<tr>
+    <td>${r.tanggal}</td><td>${r.nama}</td><td>${r.kamar_nama||'-'}</td>
+    <td>${statusMap[r.status]||r.status}</td><td>${r.keterangan||'-'}</td>
+  </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;padding:1rem">Tidak ada data</td></tr>';
+}
+
+// ── Pengumuman ──
+async function loadPengumuman(){
+  const data=await api('/api/pengumuman');
+  if(!data)return;
+  if($('btnTambahAnnounce'))$('btnTambahAnnounce').style.display=me.role==='admin'?'':'none';
+  $('announceList').innerHTML=data.length?data.map(a=>`<div class="announce-card">
+    <h4>${a.judul}</h4>
+    <div class="meta">${a.created_at} • oleh ${a.created_by_nama||'Admin'}</div>
+    <p>${a.isi}</p>
+    ${me.role==='admin'?`<button class="btn btn-danger btn-sm" style="margin-top:.5rem" onclick="hapus('pengumuman',${a.id})">Hapus</button>`:''}
+  </div>`).join(''):'<p style="text-align:center;color:#999;padding:2rem">Belum ada pengumuman</p>';
+}
+
+// ── Modals ──
+function showModal(type,editData){
+  let html='';
+  if(type==='santri'){
+    html=`<h3>${editData?'Edit':'Tambah'} Santri</h3>
+      <div class="form-group"><label>Nama</label><input id="mNama" value="${editData?.nama||''}"></div>
+      <div class="form-group"><label>Kamar</label><select id="mKamar"></select></div>
+      <div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" ${editData?.status==='aktif'?'selected':''}>Aktif</option><option value="nonaktif" ${editData?.status==='nonaktif'?'selected':''}>Nonaktif</option><option value="lulus" ${editData?.status==='lulus'?'selected':''}>Lulus</option></select></div>
+      <button class="btn btn-primary" onclick="saveSantri(${editData?.id||''})">Simpan</button>
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>`;
+    $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
+    api('/api/kamar').then(data=>{if(data)data.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;if(editData?.kamar_id===k.id)o.selected=true;$('mKamar').appendChild(o)})});
+  } else if(type==='kamar'){
+    html=`<h3>${editData?'Edit':'Tambah'} Kamar</h3>
+      <div class="form-group"><label>Nama Kamar</label><input id="mNama" value="${editData?.nama||''}"></div>
+      <div class="form-group"><label>Kapasitas</label><input type="number" id="mKapasitas" value="${editData?.kapasitas||0}"></div>
+      <div class="form-group"><label>Pengurus</label><input id="mPengurus" value="${editData?.pengurus||''}"></div>
+      <button class="btn btn-primary" onclick="saveKamar(${editData?.id||''})">Simpan</button>
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>`;
+    $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
+  } else if(type==='user'){
+    html=`<h3>${editData?'Edit':'Tambah'} Pengguna</h3>
+      <div class="form-group"><label>Nama Lengkap</label><input id="mNama" value="${editData?.nama||''}"></div>
+      <div class="form-group"><label>Username</label><input id="mUsername" value="${editData?.username||''}" ${editData?'readonly':''}></div>
+      <div class="form-group"><label>Password ${editData?'(kosongkan jika tidak diubah)':''}</label><input type="password" id="mPassword"></div>
+      <div class="form-group"><label>Role</label><select id="mRole"><option value="ustadz" ${editData?.role==='ustadz'?'selected':''}>Ustadz</option><option value="admin" ${editData?.role==='admin'?'selected':''}>Admin</option></select></div>
+      <button class="btn btn-primary" onclick="saveUser(${editData?.id||''})">Simpan</button>
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>`;
+    $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
+  } else if(type==='announce'){
+    html=`<h3>Buat Pengumuman</h3>
+      <div class="form-group"><label>Judul</label><input id="mJudul"></div>
+      <div class="form-group"><label>Isi</label><textarea id="mIsi" rows="4"></textarea></div>
+      <button class="btn btn-primary" onclick="saveAnnounce()">Kirim</button>
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>`;
+    $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
+  }
+}
+function closeModal(){$('modalBg').classList.remove('active')}
+
+async function saveSantri(id){
+  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value};
+  if(!body.nama)return toast('Nama wajib diisi');
+  const res=await api('/api/santri'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
+  toast(res.message||'Tersimpan');closeModal();loadSantri();
+}
+async function saveKamar(id){
+  const body={nama:$('mNama').value,kapasitas:parseInt($('mKapasitas').value),pengurus:$('mPengurus').value};
+  if(!body.nama)return toast('Nama wajib diisi');
+  const res=await api('/api/kamar'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
+  toast(res.message||'Tersimpan');closeModal();loadKamar();
+}
+async function saveUser(id){
+  const body={nama:$('mNama').value,username:$('mUsername').value,role:$('mRole').value};
+  const pw=$('mPassword').value;if(pw)body.password=pw;
+  if(!body.nama||!body.username)return toast('Nama & username wajib');
+  if(!id&&!pw)return toast('Password wajib untuk user baru');
+  const res=await api('/api/users'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
+  toast(res.message||'Tersimpan');closeModal();loadUsers();
+}
+async function saveAnnounce(){
+  const body={judul:$('mJudul').value,isi:$('mIsi').value};
+  if(!body.judul)return toast('Judul wajib');
+  const res=await api('/api/pengumuman',{method:'POST',body:JSON.stringify(body)});
+  toast(res.message||'Terkirim');closeModal();loadPengumuman();
+}
+async function hapus(type,id){
+  if(!confirm('Yakin hapus?'))return;
+  const res=await api('/api/'+type+'/'+id,{method:'DELETE'});
+  toast(res.message||'Dihapus');
+  if(type==='santri')loadSantri();
+  if(type==='kamar')loadKamar();
+  if(type==='users')loadUsers();
+  if(type==='pengumuman')loadPengumuman();
+}
+
+// ── Auto-login ──
+if(token)initApp();
+</script>
+</body>
+</html>

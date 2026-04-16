@@ -1,0 +1,15 @@
+{
+  "name": "pesantren-absensi",
+  "version": "1.0.0",
+  "description": "Sistem Absensi Pesantren - Fullstack Web Application",
+  "scripts": {
+    "start": "cd backend && node server.js",
+    "dev": "cd backend && npx nodemon server.js",
+    "install:all": "npm install && cd backend && npm install",
+    "db:migrate": "cd backend && node database/migrate.js",
+    "db:seed": "cd backend && node database/seed.js"
+  },
+  "keywords": ["pesantren", "absensi", "attendance", "school"],
+  "author": "rezaulin",
+  "license": "MIT"
+}

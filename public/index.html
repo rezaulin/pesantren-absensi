@@ -104,15 +104,33 @@ tr:hover{background:#f9f9f9}
 
 /* ABSENSI */
 .absensi-grid{display:grid;grid-template-columns:1fr;gap:.4rem}
-.santri-row{display:flex;align-items:center;justify-content:space-between;background:#fff;padding:.55rem .7rem;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.santri-row{display:flex;align-items:center;justify-content:space-between;background:#fff;padding:.55rem .7rem;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:all .15s}
+.santri-row.hadir{border-left:3px solid var(--green)}
+.santri-row.izin{border-left:3px solid #f9a825}
+.santri-row.sakit{border-left:3px solid #1976d2}
+.santri-row.alpa{border-left:3px solid #d32f2f}
 .santri-row .nama{font-weight:600;font-size:.85rem}
 .santri-row .kamar{font-size:.7rem;color:#888}
 .status-btns{display:flex;gap:.25rem}
-.status-btn{padding:.25rem .45rem;border:1px solid #ddd;border-radius:6px;font-size:.7rem;cursor:pointer;background:#fff;min-width:32px;text-align:center;font-weight:600}
+.status-btn{padding:.3rem .5rem;border:2px solid #e0e0e0;border-radius:8px;font-size:.75rem;cursor:pointer;background:#fff;min-width:36px;text-align:center;font-weight:700;transition:all .12s}
+.status-btn:active{transform:scale(.92)}
 .status-btn.active-H{background:#c8e6c9;border-color:var(--green);color:var(--green-dark)}
 .status-btn.active-I{background:#fff9c4;border-color:#f9a825;color:#f57f17}
 .status-btn.active-S{background:#bbdefb;border-color:#1976d2;color:#1565c0}
 .status-btn.active-A{background:#ffcdd2;border-color:#d32f2f;color:#c62828}
+.absensi-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem}
+.absensi-toolbar .search-input{flex:1;min-width:120px;padding:.5rem .7rem;border:1px solid #ddd;border-radius:10px;font-size:.85rem}
+.absensi-toolbar .search-input:focus{outline:none;border-color:var(--green)}
+.btn-semua-hadir{padding:.45rem .9rem;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .12s}
+.btn-semua-hadir:active{transform:scale(.95);opacity:.85}
+.counter-bar{display:flex;gap:.4rem;margin-bottom:.6rem;flex-wrap:wrap}
+.counter-item{padding:.3rem .6rem;border-radius:8px;font-size:.75rem;font-weight:700;display:flex;align-items:center;gap:.25rem}
+.counter-h{background:#e8f5e9;color:var(--green-dark)}
+.counter-i{background:#fff9c4;color:#f57f17}
+.counter-s{background:#bbdefb;color:#1565c0}
+.counter-a{background:#ffcdd2;color:#c62828}
+.counter-total{background:#f5f5f5;color:#666}
+.save-indicator{font-size:.7rem;color:#888;min-height:1rem}
 
 /* MODAL */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center}
@@ -215,12 +233,18 @@ tr:hover{background:#f9f9f9}
       <h3 class="section-title">Absensi Santri</h3>
       <div class="kegiatan-tabs" id="kegiatanTabs"></div>
       <div class="filter-bar" style="margin-top:.3rem">
-        <input type="date" id="absensiTanggal">
+        <input type="date" id="absensiTanggal" onchange="loadAbsensi()">
         <select id="absensiFilter" onchange="loadAbsensi()"><option value="">Semua</option></select>
       </div>
       <div id="absensiFilterLabel" style="font-size:.75rem;color:#888;margin-bottom:.3rem"></div>
+      <div class="absensi-toolbar">
+        <input type="text" class="search-input" id="searchSantri" placeholder="🔍 Cari nama santri..." oninput="filterSantri()">
+        <button class="btn-semua-hadir" onclick="semuaHadir()">✅ Semua Hadir</button>
+      </div>
+      <div class="counter-bar" id="counterBar"></div>
       <div class="absensi-grid" id="absensiGrid"></div>
-      <button class="btn btn-primary" style="margin-top:.8rem" onclick="simpanAbsensi()">Simpan Absensi</button>
+      <div class="save-indicator" id="saveIndicator"></div>
+      <button class="btn btn-primary" style="margin-top:.8rem;width:100%" onclick="simpanAbsensi()">💾 Simpan Absensi</button>
     </div>
 
     <!-- ABSEN MALAM -->
@@ -687,7 +711,7 @@ async function loadDashboard(){
 }
 
 // Absensi - Dynamic filter per kegiatan
-let absensiData={};let selectedKegiatan=null;let allSantriCache=[];
+let absensiData={};let selectedKegiatan=null;let allSantriCache=[];let allSantriRows=[];
 const filterRules=[
   {match:'ngaji malam',field:'kelompok_ngaji_malam',label:'Kelompok Ngaji Malam'},
   {match:'malam',field:'kelompok_ngaji_malam',label:'Kelompok Ngaji Malam'},
@@ -747,26 +771,62 @@ async function loadAbsensi(){
   const existingMap={};
   if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
   absensiData={};
-  $('absensiGrid').innerHTML=santri.map((s,i)=>{
+  allSantriRows=santri.map((s,i)=>{
     const ex=existingMap[s.id];
     const st=ex?ex.status:'H';
     absensiData[s.id]=st;
     const sub=filter?(s[filter.field]||'-'):(s.kamar_nama||'-');
-    return '<div class="santri-row"><div><div class="nama">'+(i+1)+'. '+s.nama+'</div><div class="kamar">'+sub+'</div></div><div class="status-btns"><div class="status-btn '+(st==='H'?'active-H':'')+'" onclick="setStatus('+s.id+',\'H\',this)">H</div><div class="status-btn '+(st==='I'?'active-I':'')+'" onclick="setStatus('+s.id+',\'I\',this)">I</div><div class="status-btn '+(st==='S'?'active-S':'')+'" onclick="setStatus('+s.id+',\'S\',this)">S</div><div class="status-btn '+(st==='A'?'active-A':'')+'" onclick="setStatus('+s.id+',\'A\',this)">A</div></div></div>';
-  }).join('')||'<p style="text-align:center;color:#999;padding:1rem">Tidak ada santri'+(filterVal?' di '+filter.label.toLowerCase()+' "'+filterVal+'"':'')+'</p>';
+    return {id:s.id,nama:s.nama,sub,idx:i+1};
+  });
+  renderAbsensiGrid();
+  updateCounter();
 }
-async function selectKegiatan(id){
-  const kegiatanList=await api('/api/kegiatan');
-  const keg=kegiatanList?kegiatanList.find(k=>k.id===id):null;
-  selectedKegiatan=id;
-  if(keg)await buildFilterDropdown(keg.nama);
-  loadAbsensi();
+function renderAbsensiGrid(){
+  const search=($('searchSantri')?.value||'').toLowerCase();
+  const filtered=search?allSantriRows.filter(s=>s.nama.toLowerCase().includes(search)):allSantriRows;
+  $('absensiGrid').innerHTML=filtered.map(s=>{
+    const st=absensiData[s.id]||'H';
+    const cls=st==='H'?'hadir':st==='I'?'izin':st==='S'?'sakit':'alpa';
+    return '<div class="santri-row '+cls+'" id="row-'+s.id+'"><div><div class="nama">'+s.idx+'. '+s.nama+'</div><div class="kamar">'+s.sub+'</div></div><div class="status-btns"><div class="status-btn '+(st==='H'?'active-H':'')+'" onclick="setStatus('+s.id+',\'H\',this)">H</div><div class="status-btn '+(st==='I'?'active-I':'')+'" onclick="setStatus('+s.id+',\'I\',this)">I</div><div class="status-btn '+(st==='S'?'active-S':'')+'" onclick="setStatus('+s.id+',\'S\',this)">S</div><div class="status-btn '+(st==='A'?'active-A':'')+'" onclick="setStatus('+s.id+',\'A\',this)">A</div></div></div>';
+  }).join('')||'<p style="text-align:center;color:#999;padding:1rem">'+(search?'Tidak ada santri bernama "'+search+'"':'Tidak ada santri')+'</p>';
+}
+function semuaHadir(){
+  Object.keys(absensiData).forEach(id=>{absensiData[id]='H'});
+  renderAbsensiGrid();
+  updateCounter();
+  toast('Semua santri ditandai Hadir ✅');
+}
+function filterSantri(){renderAbsensiGrid()}
+function updateCounter(){
+  const counts={H:0,I:0,S:0,A:0};
+  Object.values(absensiData).forEach(s=>{counts[s]=(counts[s]||0)+1});
+  const total=Object.keys(absensiData).length;
+  const bar=$('counterBar');
+  if(!bar)return;
+  bar.innerHTML=
+    '<div class="counter-item counter-total">👥 '+total+' santri</div>'+
+    '<div class="counter-item counter-h">✅ H: '+counts.H+'</div>'+
+    (counts.I?'<div class="counter-item counter-i">📝 I: '+counts.I+'</div>':'')+
+    (counts.S?'<div class="counter-item counter-s">🤒 S: '+counts.S+'</div>':'')+
+    (counts.A?'<div class="counter-item counter-a">❌ A: '+counts.A+'</div>':'');
 }
 function setStatus(id,status,el){
   absensiData[id]=status;
   const row=el.parentElement;
   row.querySelectorAll('.status-btn').forEach(b=>b.className='status-btn');
   el.classList.add('active-'+status);
+  // Update row border color
+  const rowEl=$('row-'+id);
+  if(rowEl){rowEl.className='santri-row '+(status==='H'?'hadir':status==='I'?'izin':status==='S'?'sakit':'alpa')}
+  updateCounter();
+}
+async function selectKegiatan(id){
+  const kegiatanList=await api('/api/kegiatan');
+  const keg=kegiatanList?kegiatanList.find(k=>k.id===id):null;
+  selectedKegiatan=id;
+  if(keg)await buildFilterDropdown(keg.nama);
+  if($('searchSantri'))$('searchSantri').value='';
+  loadAbsensi();
 }
 async function simpanAbsensi(){
   const tanggal=$('absensiTanggal').value;

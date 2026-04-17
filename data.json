@@ -59,6 +59,18 @@
       "kelompok_ngaji": "ustadz badrus",
       "jenis_bakat": "voli",
       "kelas_sekolah": "7"
+    },
+    {
+      "id": 3,
+      "nama": "napi",
+      "kamar_id": 3,
+      "status": "aktif",
+      "kelas_diniyyah": "1",
+      "kelompok_ngaji": "ustadz aman",
+      "jenis_bakat": "kitab",
+      "kelas_sekolah": "8",
+      "kelompok_ngaji_malam": "ustadz hasan",
+      "created_at": "2026-04-17T13:05:17.989Z"
     }
   ],
   "absensi": [

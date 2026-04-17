@@ -75,6 +75,43 @@ app.get('/api/me', authenticate, (req, res) => {
 // ── Dashboard ──────────────────────────────────────────
 app.get('/api/dashboard', authenticate, (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
+  // Wali: dashboard khusus anak-anaknya
+  if (req.user.role === 'wali') {
+    const anakList = db.santri.filter(s => s.wali_user_id === req.user.id);
+    const anakIds = anakList.map(s => s.id);
+    const absensiToday = db.absensi.filter(a => anakIds.includes(a.santri_id) && a.tanggal === today);
+    const hadir = absensiToday.filter(a => a.status === 'H').length;
+    const izin = absensiToday.filter(a => a.status === 'I' || a.status === 'S').length;
+    const alfa = absensiToday.filter(a => a.status === 'A').length;
+    // Rekap per kegiatan untuk semua anak
+    const allAbsensi = db.absensi.filter(a => anakIds.includes(a.santri_id));
+    const rekapKegiatan = {};
+    allAbsensi.forEach(a => {
+      const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
+      const nama = kg ? kg.nama : 'Lainnya';
+      if (!rekapKegiatan[nama]) rekapKegiatan[nama] = { H: 0, I: 0, S: 0, A: 0 };
+      rekapKegiatan[nama][a.status]++;
+    });
+    return res.json({
+      role: 'wali',
+      anak: anakList.map(s => {
+        const k = db.kamar.find(x => x.id === s.kamar_id);
+        const anakAbsensi = db.absensi.filter(a => a.santri_id === s.id);
+        return {
+          id: s.id, nama: s.nama, kamar_nama: k ? k.nama : '-',
+          kelas_diniyyah: s.kelas_diniyyah, kelompok_ngaji: s.kelompok_ngaji,
+          total_hadir: anakAbsensi.filter(a => a.status === 'H').length,
+          total_izin: anakAbsensi.filter(a => a.status === 'I').length,
+          total_sakit: anakAbsensi.filter(a => a.status === 'S').length,
+          total_alfa: anakAbsensi.filter(a => a.status === 'A').length,
+        };
+      }),
+      hadir_hari_ini: hadir, izin_sakit: izin, alfa,
+      rekap_kegiatan: rekapKegiatan,
+      pengumuman: db.pengumuman.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5)
+    });
+  }
+  // Admin/ustadz: dashboard biasa
   const hadir = db.absensi.filter(a => a.tanggal === today && a.status === 'H').length;
   const izin = db.absensi.filter(a => a.tanggal === today && (a.status === 'I' || a.status === 'S')).length;
   const alfa = db.absensi.filter(a => a.tanggal === today && a.status === 'A').length;
@@ -86,6 +123,31 @@ app.get('/api/dashboard', authenticate, (req, res) => {
     alfa: alfa,
     pengumuman: db.pengumuman.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3)
   });
+});
+
+// ── Wali Endpoints ─────────────────────────────────────
+app.get('/api/wali/anak', authenticate, (req, res) => {
+  if (req.user.role !== 'wali') return res.status(403).json({ message: 'Hanya wali santri' });
+  const anakList = db.santri.filter(s => s.wali_user_id === req.user.id);
+  res.json(anakList.map(s => {
+    const k = db.kamar.find(x => x.id === s.kamar_id);
+    return { ...s, kamar_nama: k ? k.nama : '-' };
+  }));
+});
+app.get('/api/wali/rekap', authenticate, (req, res) => {
+  if (req.user.role !== 'wali') return res.status(403).json({ message: 'Hanya wali santri' });
+  const anakIds = db.santri.filter(s => s.wali_user_id === req.user.id).map(s => s.id);
+  let list = db.absensi.filter(a => anakIds.includes(a.santri_id));
+  if (req.query.santri_id) list = list.filter(a => a.santri_id == req.query.santri_id);
+  if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
+  if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
+  res.json(list.map(a => {
+    const s = db.santri.find(x => x.id === a.santri_id);
+    const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+    const kg = db.kegiatan.find(x => x.id === a.kegiatan_id);
+    return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-', kegiatan_nama: kg ? kg.nama : '-', status: a.status, keterangan: a.keterangan };
+  }).sort((a, b) => b.tanggal.localeCompare(a.tanggal)));
 });
 
 // ── Users ──────────────────────────────────────────────
@@ -152,13 +214,14 @@ app.get('/api/santri', authenticate, (req, res) => {
   }));
 });
 app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
-  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah, kelompok_ngaji_malam } = req.body;
+  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah, kelompok_ngaji_malam, wali_user_id } = req.body;
   if (!nama || !kamar_id) return res.status(400).json({ message: 'Nama & kamar wajib' });
   const s = {
     id: nextId(db.santri), nama, kamar_id: parseInt(kamar_id), status: status || 'aktif',
     kelas_diniyyah: kelas_diniyyah || '', kelompok_ngaji: kelompok_ngaji || '',
     jenis_bakat: jenis_bakat || '', kelas_sekolah: kelas_sekolah || '',
     kelompok_ngaji_malam: kelompok_ngaji_malam || '',
+    wali_user_id: wali_user_id ? parseInt(wali_user_id) : null,
     created_at: new Date().toISOString()
   };
   db.santri.push(s); saveDB(db); res.json(s);
@@ -169,6 +232,7 @@ app.put('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
   const fields = ['nama', 'status', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah', 'kelompok_ngaji_malam'];
   fields.forEach(f => { if (req.body[f] !== undefined) s[f] = req.body[f]; });
   if (req.body.kamar_id) s.kamar_id = parseInt(req.body.kamar_id);
+  if (req.body.wali_user_id !== undefined) s.wali_user_id = req.body.wali_user_id ? parseInt(req.body.wali_user_id) : null;
   saveDB(db); res.json({ message: 'Santri diupdate' });
 });
 app.delete('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
@@ -219,6 +283,7 @@ app.get('/api/absensi', authenticate, (req, res) => {
   }));
 });
 app.post('/api/absensi/bulk', authenticate, (req, res) => {
+  if (req.user.role === 'wali') return res.status(403).json({ message: 'Wali tidak bisa mengubah absensi' });
   const { tanggal, kegiatan_id, items } = req.body;
   if (!tanggal || !kegiatan_id || !items) return res.status(400).json({ message: 'Data tidak lengkap (tanggal, kegiatan_id, items wajib)' });
   items.forEach(item => {

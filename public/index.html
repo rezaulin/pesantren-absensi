@@ -396,6 +396,26 @@ tr:hover{background:#f9f9f9}
       <div class="grid-menu" id="fullMenu"></div>
     </div>
 
+    <!-- WALI DASHBOARD -->
+    <div class="page" id="page-walidashboard">
+      <h3 class="section-title">Dashboard Wali Santri</h3>
+      <div id="waliAnakCards"></div>
+      <div class="section-title" style="margin-top:1rem">Rekap Per Kegiatan</div>
+      <div id="waliRekapKegiatan"></div>
+    </div>
+
+    <!-- WALI REKAP -->
+    <div class="page" id="page-walirekap">
+      <h3 class="section-title">Rekap Absensi Anak</h3>
+      <div class="filter-bar">
+        <select id="waliRekapAnak" onchange="loadWaliRekap()"><option value="">Semua Anak</option></select>
+        <input type="date" id="waliRekapDari">
+        <input type="date" id="waliRekapSampai">
+        <button class="btn btn-primary btn-sm" onclick="loadWaliRekap()">Filter</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Anak</th><th>Kamar</th><th>Kegiatan</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="waliRekapBody"></tbody></table></div>
+    </div>
+
   </div><!-- /content -->
 </div><!-- /app -->
 
@@ -461,7 +481,7 @@ async function initApp(){
   $('app').classList.add('active');
   $('bottomNav').style.display='flex';
   $('profilePic').textContent=me.nama?me.nama.charAt(0).toUpperCase():'U';
-  $('roleBadge').textContent=me.role==='admin'?'👑 Admin':'📖 Ustadz';
+  $('roleBadge').textContent=me.role==='admin'?'👑 Admin':me.role==='wali'?'👪 Wali Santri':'📖 Ustadz';
   buildNav();
   buildGridMenu();
   switchTab('home');
@@ -485,7 +505,16 @@ function buildNav(){
     {id:'raport',icon:'📜',label:'Raport Santri'},
     {id:'pengaturan',icon:'⚙️',label:'Pengaturan'},
   ];
-  if(me.role!=='admin'){
+  if(me.role==='wali'){
+    // Wali: menu terbatas
+    const waliItems=[
+      {id:'home',icon:'🏠',label:'Beranda'},
+      {id:'walirekap',icon:'📋',label:'Rekap Absensi Anak'},
+      {id:'pengumuman',icon:'📢',label:'Pengumuman'},
+      {id:'logout',icon:'🚪',label:'Keluar'},
+    ];
+    renderNavList(waliItems);
+  } else if(me.role!=='admin'){
     // ustadz only sees limited items
     const allowed=['home','absensi','santri','rekap','absenmalam','absensekolah','pengumuman','raport','pelanggaran'];
     const filtered=items.filter(i=>allowed.includes(i.id));
@@ -527,7 +556,11 @@ function buildGridMenu(){
     {id:'rekap',icon:'📋',label:'Rekap',highlight:false},
     {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
   ];
-  const menu=me.role==='admin'?adminMenu:ustadzMenu;
+  const waliMenu=[
+    {id:'walirekap',icon:'📋',label:'Rekap Absensi',highlight:true},
+    {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
+  ];
+  const menu=me.role==='admin'?adminMenu:me.role==='wali'?waliMenu:ustadzMenu;
   $('gridMenu').innerHTML=menu.map(m=>'<div class="menu-item'+(m.highlight?' highlight':'')+'" onclick="handleMenuClick(\''+m.id+'\')"><div class="menu-icon">'+m.icon+'</div><div class="menu-label">'+m.label+'</div></div>').join('');
   // Full menu page
   $('fullMenu').innerHTML=menu.map(m=>'<div class="menu-item'+(m.highlight?' highlight':'')+'" onclick="handleMenuClick(\''+m.id+'\')"><div class="menu-icon">'+m.icon+'</div><div class="menu-label">'+m.label+'</div></div>').join('');
@@ -541,6 +574,8 @@ function handleMenuClick(id){
 // Navigation
 function switchTab(tab){
   currentTab=tab;
+  // Wali: redirect home to wali dashboard
+  if(tab==='home'&&me&&me.role==='wali')tab='walidashboard';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const el=$('page-'+tab);
   if(el)el.classList.add('active');
@@ -573,6 +608,7 @@ function loadPageData(page){
   if(page==='raport')loadRaportForm();
   if(page==='sensus')loadSensus();
   if(page==='laporan')loadLaporan();
+  if(page==='walirekap')loadWaliRekap();
 }
 
 function toggleSidebar(force){
@@ -587,6 +623,11 @@ async function loadDashboard(){
   if(!d)return;
   $('welcomeName').textContent="Assalamu'alaikum, "+(me.nama||'User');
   $('welcomeDate').textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  // Wali: redirect to wali dashboard
+  if(d.role==='wali'){
+    loadWaliDashboard();
+    return;
+  }
   $('statsContainer').innerHTML=
     '<div class="stat-card"><div class="num">'+(d.totalSantri||0)+'</div><div class="label">Total Santri</div></div>'+
     '<div class="stat-card"><div class="num">'+(d.hadirHariIni||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
@@ -899,14 +940,15 @@ async function loadPengumuman(){
 function showModal(type,editData){
   let html='';
   if(type==='santri'){
-    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div><div class="form-group"><label>Kelas Diniyyah</label><input id="mKelasDiniyyah" value="'+(editData?.kelas_diniyyah||'')+'" placeholder="Contoh: 1A, 2B, 3A"></div><div class="form-group"><label>Kelompok Ngaji</label><input id="mKelompokNgaji" value="'+(editData?.kelompok_ngaji||'')+'" placeholder="Contoh: Juz 1, Tahsin"></div><div class="form-group"><label>Kelas Sekolah Formal</label><input id="mKelasSekolah" value="'+(editData?.kelas_sekolah||'')+'" placeholder="Contoh: 7A, 8B, 9A"></div><div class="form-group"><label>Jenis Bakat</label><input id="mJenisBakat" value="'+(editData?.jenis_bakat||'')+'" placeholder="Contoh: Tahfidz, Kaligrafi"></div><div class="form-group"><label>Kelompok Ngaji Malam</label><input id="mKelompokNgajiMalam" value="'+(editData?.kelompok_ngaji_malam||'')+'" placeholder="Contoh: Ust. Ahmad, Ust. Hasan"></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
+    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div><div class="form-group"><label>Kelas Diniyyah</label><input id="mKelasDiniyyah" value="'+(editData?.kelas_diniyyah||'')+'" placeholder="Contoh: 1A, 2B, 3A"></div><div class="form-group"><label>Kelompok Ngaji</label><input id="mKelompokNgaji" value="'+(editData?.kelompok_ngaji||'')+'" placeholder="Contoh: Juz 1, Tahsin"></div><div class="form-group"><label>Kelas Sekolah Formal</label><input id="mKelasSekolah" value="'+(editData?.kelas_sekolah||'')+'" placeholder="Contoh: 7A, 8B, 9A"></div><div class="form-group"><label>Jenis Bakat</label><input id="mJenisBakat" value="'+(editData?.jenis_bakat||'')+'" placeholder="Contoh: Tahfidz, Kaligrafi"></div><div class="form-group"><label>Kelompok Ngaji Malam</label><input id="mKelompokNgajiMalam" value="'+(editData?.kelompok_ngaji_malam||'')+'" placeholder="Contoh: Ust. Ahmad, Ust. Hasan"></div><div class="form-group"><label>Wali Santri</label><select id="mWali"><option value="">-- Tidak Ada --</option></select></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
     api('/api/kamar').then(data=>{if(data)data.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;if(editData?.kamar_id===k.id)o.selected=true;$('mKamar').appendChild(o)})});
+    api('/api/users').then(data=>{if(data)data.filter(u=>u.role==='wali').forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.nama;if(editData?.wali_user_id===u.id)o.selected=true;$('mWali').appendChild(o)})});
   } else if(type==='kamar'){
     html='<h3>'+(editData?'Edit':'Tambah')+' Kamar</h3><div class="form-group"><label>Nama Kamar</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kapasitas</label><input type="number" id="mKapasitas" value="'+(editData?.kapasitas||0)+'"></div><div class="form-group"><label>Pengurus</label><input id="mPengurus" value="'+(editData?.pengurus||'')+'"></div><button class="btn btn-primary" onclick="saveKamar('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
   } else if(type==='user'){
-    html='<h3>'+(editData?'Edit':'Tambah')+' Pengguna</h3><div class="form-group"><label>Nama Lengkap</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Username</label><input id="mUsername" value="'+(editData?.username||'')+'" '+(editData?'readonly':'')+'></div><div class="form-group"><label>Password '+(editData?'(kosongkan jika tidak diubah)':'')+'</label><input type="password" id="mPassword"></div><div class="form-group"><label>Role</label><select id="mRole"><option value="ustadz" '+(editData?.role==='ustadz'?'selected':'')+'>Ustadz</option><option value="admin" '+(editData?.role==='admin'?'selected':'')+'>Admin</option></select></div><button class="btn btn-primary" onclick="saveUser('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
+    html='<h3>'+(editData?'Edit':'Tambah')+' Pengguna</h3><div class="form-group"><label>Nama Lengkap</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Username</label><input id="mUsername" value="'+(editData?.username||'')+'" '+(editData?'readonly':'')+'></div><div class="form-group"><label>Password '+(editData?'(kosongkan jika tidak diubah)':'')+'</label><input type="password" id="mPassword"></div><div class="form-group"><label>Role</label><select id="mRole"><option value="ustadz" '+(editData?.role==='ustadz'?'selected':'')+'>Ustadz</option><option value="wali" '+(editData?.role==='wali'?'selected':'')+'>Wali Santri</option><option value="admin" '+(editData?.role==='admin'?'selected':'')+'>Admin</option></select></div><button class="btn btn-primary" onclick="saveUser('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
   } else if(type==='announce'){
     html='<h3>Buat Pengumuman</h3><div class="form-group"><label>Judul</label><input id="mJudul"></div><div class="form-group"><label>Isi</label><textarea id="mIsi" rows="4"></textarea></div><button class="btn btn-primary" onclick="saveAnnounce()">Kirim</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
@@ -928,7 +970,7 @@ function showModal(type,editData){
 function closeModal(){$('modalBg').classList.remove('active')}
 
 async function saveSantri(id){
-  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,kelas_diniyyah:$('mKelasDiniyyah').value,kelompok_ngaji:$('mKelompokNgaji').value,kelas_sekolah:$('mKelasSekolah').value,jenis_bakat:$('mJenisBakat').value,kelompok_ngaji_malam:$('mKelompokNgajiMalam').value};
+  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,kelas_diniyyah:$('mKelasDiniyyah').value,kelompok_ngaji:$('mKelompokNgaji').value,kelas_sekolah:$('mKelasSekolah').value,jenis_bakat:$('mJenisBakat').value,kelompok_ngaji_malam:$('mKelompokNgajiMalam').value,wali_user_id:$('mWali').value||null};
   if(!body.nama)return toast('Nama wajib diisi');
   const res=await api('/api/santri'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
   toast(res.message||'Tersimpan');closeModal();loadSantri();
@@ -1111,6 +1153,36 @@ async function loadAppSettings(){
     if(s.background){document.documentElement.style.setProperty('--login-bg','url('+s.background+')');$('loginPage').style.backgroundSize='cover';$('loginPage').style.backgroundPosition='center'}
     }
   }catch(e){}
+}
+
+// ── Wali Santri ──
+async function loadWaliDashboard(){
+  const d=await api('/api/dashboard');
+  if(!d||d.role!=='wali')return;
+  // Anak cards
+  $('waliAnakCards').innerHTML=d.anak.map(a=>'<div style="background:#fff;border-radius:12px;padding:1rem;margin-bottom:.7rem;box-shadow:0 1px 4px rgba(0,0,0,.08)"><h4 style="color:var(--green-dark);margin-bottom:.3rem">'+a.nama+'</h4><div style="font-size:.8rem;color:#666;margin-bottom:.5rem">Kamar: '+(a.kamar_nama||'-')+' | Diniyyah: '+(a.kelas_diniyyah||'-')+' | Ngaji: '+(a.kelompok_ngaji||'-')+'</div><div style="display:flex;gap:.5rem"><div style="flex:1;text-align:center;background:#e8f5e9;padding:.5rem;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#2e7d32">'+a.total_hadir+'</div><div style="font-size:.7rem;color:#888">Hadir</div></div><div style="flex:1;text-align:center;background:#fff9c4;padding:.5rem;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#f9a825">'+a.total_izin+'</div><div style="font-size:.7rem;color:#888">Izin</div></div><div style="flex:1;text-align:center;background:#bbdefb;padding:.5rem;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#1976d2">'+a.total_sakit+'</div><div style="font-size:.7rem;color:#888">Sakit</div></div><div style="flex:1;text-align:center;background:#ffcdd2;padding:.5rem;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#d32f2f">'+a.total_alfa+'</div><div style="font-size:.7rem;color:#888">Alfa</div></div></div></div>').join('')||'<p style="text-align:center;color:#999;padding:1rem">Belum ada data anak</p>';
+  // Rekap per kegiatan
+  if(d.rekap_kegiatan&&Object.keys(d.rekap_kegiatan).length){
+    $('waliRekapKegiatan').innerHTML='<div class="table-wrap"><table><thead><tr><th>Kegiatan</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alfa</th></tr></thead><tbody>'+Object.entries(d.rekap_kegiatan).map(([k,r])=>'<tr><td>'+k+'</td><td>'+r.H+'</td><td>'+r.I+'</td><td>'+r.S+'</td><td>'+r.A+'</td></tr>').join('')+'</tbody></table></div>';
+  }
+  // Populate anak filter
+  if(d.anak&&$('waliRekapAnak')){
+    $('waliRekapAnak').innerHTML='<option value="">Semua Anak</option>';
+    d.anak.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=a.nama;$('waliRekapAnak').appendChild(o)});
+  }
+}
+async function loadWaliRekap(){
+  const params=new URLSearchParams();
+  const anakId=$('waliRekapAnak')?.value;
+  const dari=$('waliRekapDari')?.value;
+  const sampai=$('waliRekapSampai')?.value;
+  if(anakId)params.set('santri_id',anakId);
+  if(dari)params.set('dari',dari);
+  if(sampai)params.set('sampai',sampai);
+  const data=await api('/api/wali/rekap?'+params);
+  if(!data)return;
+  const statusMap={H:'✅ Hadir',I:'📝 Izin',S:'🤒 Sakit',A:'❌ Alfa'};
+  $('waliRekapBody').innerHTML=data.map(r=>'<tr><td>'+r.tanggal+'</td><td>'+r.nama+'</td><td>'+r.kamar_nama+'</td><td>'+r.kegiatan_nama+'</td><td>'+statusMap[r.status]+'</td><td>'+(r.keterangan||'-')+'</td></tr>').join('')||'<tr><td colspan="6" style="text-align:center;padding:1rem">Tidak ada data</td></tr>';
 }
 
 // Auto-login

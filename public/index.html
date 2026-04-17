@@ -604,13 +604,14 @@ async function loadDashboard(){
 // Absensi - Dynamic filter per kegiatan
 let absensiData={};let selectedKegiatan=null;let allSantriCache=[];
 const filterRules=[
-  {match:'malam',field:'kamar_id',label:'Kamar'},
+  {match:'ngaji malam',field:'kelompok_ngaji_malam',label:'Kelompok Ngaji Malam'},
+  {match:'malam',field:'kelompok_ngaji_malam',label:'Kelompok Ngaji Malam'},
   {match:'bakat',field:'jenis_bakat',label:'Jenis Bakat'},
   {match:'madrasah',field:'kelas_diniyyah',label:'Kelas Diniyyah'},
   {match:'diniyyah',field:'kelas_diniyyah',label:'Kelas Diniyyah'},
   {match:'sekolah',field:'kelas_sekolah',label:'Kelas Sekolah'},
-  {match:'qur\'an',field:'kelompok_ngaji',label:'Kelompok Ngaji'},
-  {match:'ngaji',field:'kelompok_ngaji',label:'Kelompok Ngaji'},
+  {match:'qur\'an',field:'kelompok_ngaji',label:'Kelompok Ngaji Al-Qur\'an'},
+  {match:'ngaji',field:'kelompok_ngaji',label:'Kelompok Ngaji Al-Qur\'an'},
 ];
 function getFilterForKegiatan(nama){
   const n=nama.toLowerCase();
@@ -626,12 +627,14 @@ async function buildFilterDropdown(kegNama){
   sel.innerHTML='<option value="">Semua</option>';
   if(!filter){sel.style.display='none';lbl.textContent='';return}
   sel.style.display='';
-  if(allSantriCache.length===0)allSantriCache=await api('/api/santri')||[];
+  // Always refresh santri cache for auto-sync
+  allSantriCache=await api('/api/santri')||[];
   if(filter.field==='kamar_id'){
     const kamar=await api('/api/kamar');
     if(kamar)kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;sel.appendChild(o)});
   }else{
     const vals=[...new Set(allSantriCache.map(s=>s[filter.field]).filter(Boolean))].sort();
+    if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
     vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
   }
   lbl.textContent='Filter: '+filter.label;
@@ -701,11 +704,13 @@ async function loadAbsenMalam(){
   if(kamarList&&$('malamKamar').options.length<=1){
     kamarList.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('malamKamar').appendChild(o)});
   }
-  // Populate kelompok ngaji malam dropdown (from all santri)
+  // Always refresh kelompok ngaji malam dropdown from santri data (auto-sync)
   const allSantri=await api('/api/santri');
-  if(allSantri&&$('malamKelompok').options.length<=1){
+  if(allSantri){
+    const savedKelompok=$('malamKelompok').value;
+    $('malamKelompok').innerHTML='<option value="">Semua Kelompok</option>';
     const kelompokSet=new Set(allSantri.map(s=>s.kelompok_ngaji_malam).filter(Boolean));
-    [...kelompokSet].sort().forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;$('malamKelompok').appendChild(o)});
+    [...kelompokSet].sort().forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;if(k===savedKelompok)o.selected=true;$('malamKelompok').appendChild(o)});
   }
   // Fetch santri (filter by kamar and/or kelompok if selected)
   let santriUrl='/api/santri?';
@@ -756,16 +761,17 @@ async function loadAbsenSekolah(){
   if(!$('sekolahTanggal').value)$('sekolahTanggal').value=today;
   const tanggal=$('sekolahTanggal').value;
   const kelasFilter=$('sekolahKelas').value;
-  let santriUrl='/api/santri';
-  if(kelasFilter)santriUrl+='?kelas_sekolah='+encodeURIComponent(kelasFilter);
-  const santri=await api(santriUrl);
-  if(!santri)return;
-  // populate kelas filter
+  // Always fetch all santri first for filter population + auto-sync
   const allSantri=await api('/api/santri');
-  if(allSantri&&$('sekolahKelas').options.length<=1){
-    const kelasSet=new Set(allSantri.map(s=>s.kelas_sekolah).filter(Boolean));
-    kelasSet.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;$('sekolahKelas').appendChild(o)});
-  }
+  if(!allSantri)return;
+  // Refresh kelas filter dropdown from santri data
+  const savedVal=$('sekolahKelas').value;
+  $('sekolahKelas').innerHTML='<option value="">Semua Kelas</option>';
+  const kelasSet=new Set(allSantri.map(s=>s.kelas_sekolah).filter(Boolean));
+  [...kelasSet].sort().forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;if(k===savedVal)o.selected=true;$('sekolahKelas').appendChild(o)});
+  // Filter santri by kelas if selected
+  let santri=allSantri;
+  if(kelasFilter)santri=allSantri.filter(s=>s.kelas_sekolah===kelasFilter);
   const kegiatanList=await api('/api/kegiatan');
   let sekolahKegiatan=kegiatanList?kegiatanList.find(k=>k.nama.toLowerCase().includes('sekolah')):null;
   if(!sekolahKegiatan){$('sekolahGrid').innerHTML='<p style="text-align:center;color:#999;padding:1rem">Buat kegiatan "Sekolah Formal" dulu</p>';return}

@@ -200,10 +200,14 @@ app.get('/api/absensi', authenticate, (req, res) => {
   let list = db.absensi;
   if (req.query.tanggal) list = list.filter(a => a.tanggal === req.query.tanggal);
   if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
-  if (req.query.kamar_id) {
-    const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
-    list = list.filter(a => santriIds.includes(a.santri_id));
-  }
+  // Filter by santri attributes
+  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  santriFilters.forEach(f => {
+    if (req.query[f]) {
+      const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);
+      list = list.filter(a => santriIds.includes(a.santri_id));
+    }
+  });
   res.json(list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);
     const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
@@ -229,10 +233,14 @@ app.get('/api/rekap', authenticate, (req, res) => {
   if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
   if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
   if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
-  if (req.query.kamar_id) {
-    const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
-    list = list.filter(a => santriIds.includes(a.santri_id));
-  }
+  // Filter by santri attributes
+  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  santriFilters.forEach(f => {
+    if (req.query[f]) {
+      const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);
+      list = list.filter(a => santriIds.includes(a.santri_id));
+    }
+  });
   res.json(list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);
     const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
@@ -286,10 +294,13 @@ app.get('/api/export/pdf', authenticate, (req, res) => {
   if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
   if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
   if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
-  if (req.query.kamar_id) {
-    const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
-    list = list.filter(a => santriIds.includes(a.santri_id));
-  }
+  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  santriFilters.forEach(f => {
+    if (req.query[f]) {
+      const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);
+      list = list.filter(a => santriIds.includes(a.santri_id));
+    }
+  });
 
   const data = list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);

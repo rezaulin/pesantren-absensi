@@ -215,9 +215,10 @@ tr:hover{background:#f9f9f9}
       <h3 class="section-title">Absensi Santri</h3>
       <div class="kegiatan-tabs" id="kegiatanTabs"></div>
       <div class="filter-bar" style="margin-top:.3rem">
-        <select id="absensiKamar" onchange="loadAbsensi()"><option value="">Semua Kamar</option></select>
         <input type="date" id="absensiTanggal">
+        <select id="absensiFilter" onchange="loadAbsensi()"><option value="">Semua</option></select>
       </div>
+      <div id="absensiFilterLabel" style="font-size:.75rem;color:#888;margin-bottom:.3rem"></div>
       <div class="absensi-grid" id="absensiGrid"></div>
       <button class="btn btn-primary" style="margin-top:.8rem" onclick="simpanAbsensi()">Simpan Absensi</button>
     </div>
@@ -545,27 +546,61 @@ async function loadDashboard(){
   }
 }
 
-// Absensi
-let absensiData={};let selectedKegiatan=null;
+// Absensi - Dynamic filter per kegiatan
+let absensiData={};let selectedKegiatan=null;let allSantriCache=[];
+const filterRules=[
+  {match:'malam',field:'kamar_id',label:'Kamar'},
+  {match:'bakat',field:'jenis_bakat',label:'Jenis Bakat'},
+  {match:'madrasah',field:'kelas_diniyyah',label:'Kelas Diniyyah'},
+  {match:'diniyyah',field:'kelas_diniyyah',label:'Kelas Diniyyah'},
+  {match:'sekolah',field:'kelas_sekolah',label:'Kelas Sekolah'},
+  {match:'qur\'an',field:'kelompok_ngaji',label:'Kelompok Ngaji'},
+  {match:'ngaji',field:'kelompok_ngaji',label:'Kelompok Ngaji'},
+];
+function getFilterForKegiatan(nama){
+  const n=nama.toLowerCase();
+  for(const rule of filterRules){
+    if(n.includes(rule.match)) return {field:rule.field,label:rule.label};
+  }
+  return null;
+}
+async function buildFilterDropdown(kegNama){
+  const filter=getFilterForKegiatan(kegNama);
+  const sel=$('absensiFilter');
+  const lbl=$('absensiFilterLabel');
+  sel.innerHTML='<option value="">Semua</option>';
+  if(!filter){sel.style.display='none';lbl.textContent='';return}
+  sel.style.display='';
+  if(allSantriCache.length===0)allSantriCache=await api('/api/santri')||[];
+  if(filter.field==='kamar_id'){
+    const kamar=await api('/api/kamar');
+    if(kamar)kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;sel.appendChild(o)});
+  }else{
+    const vals=[...new Set(allSantriCache.map(s=>s[filter.field]).filter(Boolean))].sort();
+    vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
+  }
+  lbl.textContent='Filter: '+filter.label;
+}
 async function loadAbsensi(){
   const today=new Date().toISOString().slice(0,10);
   if(!$('absensiTanggal').value)$('absensiTanggal').value=today;
-  const kamarId=$('absensiKamar').value;
+  const filterVal=$('absensiFilter').value;
   const tanggal=$('absensiTanggal').value;
   const kegiatanList=await api('/api/kegiatan');
   if(kegiatanList&&kegiatanList.length){
-    if(!selectedKegiatan)selectedKegiatan=kegiatanList[0].id;
+    if(!selectedKegiatan){selectedKegiatan=kegiatanList[0].id;await buildFilterDropdown(kegiatanList[0].nama)}
     $('kegiatanTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedKegiatan?'active':'')+'" onclick="selectKegiatan('+k.id+')">'+k.nama+'</div>').join('');
   }
-  const [santri,existing]=await Promise.all([
-    api('/api/santri'+(kamarId?'?kamar_id='+kamarId:'')),
-    api('/api/absensi?tanggal='+tanggal+'&kegiatan_id='+selectedKegiatan+(kamarId?'&kamar_id='+kamarId:''))
-  ]);
-  if(!santri)return;
-  const kamar=await api('/api/kamar');
-  if(kamar&&$('absensiKamar').options.length<=1){
-    kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('absensiKamar').appendChild(o)});
+  const kegName=kegiatanList?kegiatanList.find(k=>k.id===selectedKegiatan)?.nama||'':'';
+  const filter=getFilterForKegiatan(kegName);
+  let santriUrl='/api/santri';
+  let absensiUrl='/api/absensi?tanggal='+tanggal+'&kegiatan_id='+selectedKegiatan;
+  if(filterVal&&filter){
+    santriUrl+='?'+filter.field+'='+encodeURIComponent(filterVal);
+    absensiUrl+='&'+filter.field+'='+encodeURIComponent(filterVal);
   }
+  const [santri,existing]=await Promise.all([api(santriUrl),api(absensiUrl)]);
+  if(!santri)return;
   const existingMap={};
   if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
   absensiData={};
@@ -573,10 +608,17 @@ async function loadAbsensi(){
     const ex=existingMap[s.id];
     const st=ex?ex.status:'H';
     absensiData[s.id]=st;
-    return '<div class="santri-row"><div><div class="nama">'+(i+1)+'. '+s.nama+'</div><div class="kamar">'+(s.kamar_nama||'-')+'</div></div><div class="status-btns"><div class="status-btn '+(st==='H'?'active-H':'')+'" onclick="setStatus('+s.id+',\'H\',this)">H</div><div class="status-btn '+(st==='I'?'active-I':'')+'" onclick="setStatus('+s.id+',\'I\',this)">I</div><div class="status-btn '+(st==='S'?'active-S':'')+'" onclick="setStatus('+s.id+',\'S\',this)">S</div><div class="status-btn '+(st==='A'?'active-A':'')+'" onclick="setStatus('+s.id+',\'A\',this)">A</div></div></div>';
-  }).join('');
+    const sub=filter?(s[filter.field]||'-'):(s.kamar_nama||'-');
+    return '<div class="santri-row"><div><div class="nama">'+(i+1)+'. '+s.nama+'</div><div class="kamar">'+sub+'</div></div><div class="status-btns"><div class="status-btn '+(st==='H'?'active-H':'')+'" onclick="setStatus('+s.id+',\'H\',this)">H</div><div class="status-btn '+(st==='I'?'active-I':'')+'" onclick="setStatus('+s.id+',\'I\',this)">I</div><div class="status-btn '+(st==='S'?'active-S':'')+'" onclick="setStatus('+s.id+',\'S\',this)">S</div><div class="status-btn '+(st==='A'?'active-A':'')+'" onclick="setStatus('+s.id+',\'A\',this)">A</div></div></div>';
+  }).join('')||'<p style="text-align:center;color:#999;padding:1rem">Tidak ada santri'+(filterVal?' di '+filter.label.toLowerCase()+' "'+filterVal+'"':'')+'</p>';
 }
-function selectKegiatan(id){selectedKegiatan=id;loadAbsensi()}
+async function selectKegiatan(id){
+  const kegiatanList=await api('/api/kegiatan');
+  const keg=kegiatanList?kegiatanList.find(k=>k.id===id):null;
+  selectedKegiatan=id;
+  if(keg)await buildFilterDropdown(keg.nama);
+  loadAbsensi();
+}
 function setStatus(id,status,el){
   absensiData[id]=status;
   const row=el.parentElement;

@@ -1153,7 +1153,7 @@ function exportRaportPDF(){
   const dari=$('raportDari').value||'';
   const sampai=$('raportSampai').value||'';
   let url='/api/raport/'+sid+'/pdf?dari='+dari+'&sampai='+sampai;
-  fetch(url,{headers:{'Authorization':'Bearer '+tkn}}).then(r=>r.blob()).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='raport-santri.pdf';a.click()});
+  fetch(url,{headers:{'Authorization':'Bearer '+tkn}}).then(r=>{if(!r.ok)return r.json().then(e=>{throw new Error(e.message||'Gagal export PDF')});return r.blob()}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='raport-santri.pdf';a.click()}).catch(e=>toast(e.message));
 }
 
 // PDF Export
@@ -1168,7 +1168,7 @@ function exportPDF(){
   if(sampai)url+='sampai='+sampai+'&';
   if(kamar)url+='kamar_id='+kamar+'&';
   if(kegiatan)url+='kegiatan_id='+kegiatan+'&';
-  fetch(url,{headers:{'Authorization':'Bearer '+tkn}}).then(r=>r.blob()).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rekap-absensi.pdf';a.click()});
+  fetch(url,{headers:{'Authorization':'Bearer '+tkn}}).then(r=>{if(!r.ok)return r.json().then(e=>{throw new Error(e.message||'Gagal export PDF')});return r.blob()}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rekap-absensi.pdf';a.click()}).catch(e=>toast(e.message));
 }
 
 // Settings

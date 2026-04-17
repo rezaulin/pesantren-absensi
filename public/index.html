@@ -691,7 +691,7 @@ async function loadSantri(){
   $('santriTable').querySelector('tbody').innerHTML=data.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+s.nama+'</td><td>'+(s.kamar_nama||'-')+'</td><td>'+(s.kelas_diniyyah||'-')+'</td><td>'+(s.kelompok_ngaji||'-')+'</td><td>'+(s.kelas_sekolah||'-')+'</td><td>'+(s.jenis_bakat||'-')+'</td><td><span style="color:'+(s.status==='aktif'?'green':'red')+'">'+s.status+'</span></td><td>'+(me.role==='admin'?'<button class="btn btn-outline btn-sm" onclick="editSantri('+s.id+')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus(\'santri\','+s.id+')">🗑️</button>':'')+'</td></tr>').join('');
   if($('btnTambahSantri'))$('btnTambahSantri').style.display=me.role==='admin'?'':'none';
 }
-function editSantri(id){api('/api/santri/'+id).then(s=>{if(s)showModal('santri',s)})}
+function editSantri(id){api('/api/santri').then(data=>{const s=data.find(x=>x.id===id);if(s)showModal('santri',s)})}
 
 // Kamar CRUD
 async function loadKamar(){

@@ -145,18 +145,20 @@ app.get('/api/santri', authenticate, (req, res) => {
   if (req.query.kelompok_ngaji) list = list.filter(s => s.kelompok_ngaji === req.query.kelompok_ngaji);
   if (req.query.kelas_sekolah) list = list.filter(s => s.kelas_sekolah === req.query.kelas_sekolah);
   if (req.query.jenis_bakat) list = list.filter(s => s.jenis_bakat === req.query.jenis_bakat);
+  if (req.query.kelompok_ngaji_malam) list = list.filter(s => s.kelompok_ngaji_malam === req.query.kelompok_ngaji_malam);
   res.json(list.map(s => {
     const k = db.kamar.find(x => x.id === s.kamar_id);
     return { ...s, kamar_nama: k ? k.nama : '-' };
   }));
 });
 app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
-  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah } = req.body;
+  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah, kelompok_ngaji_malam } = req.body;
   if (!nama || !kamar_id) return res.status(400).json({ message: 'Nama & kamar wajib' });
   const s = {
     id: nextId(db.santri), nama, kamar_id: parseInt(kamar_id), status: status || 'aktif',
     kelas_diniyyah: kelas_diniyyah || '', kelompok_ngaji: kelompok_ngaji || '',
     jenis_bakat: jenis_bakat || '', kelas_sekolah: kelas_sekolah || '',
+    kelompok_ngaji_malam: kelompok_ngaji_malam || '',
     created_at: new Date().toISOString()
   };
   db.santri.push(s); saveDB(db); res.json(s);
@@ -164,7 +166,7 @@ app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
 app.put('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
   const s = db.santri.find(x => x.id == req.params.id);
   if (!s) return res.status(404).json({ message: 'Santri tidak ditemukan' });
-  const fields = ['nama', 'status', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  const fields = ['nama', 'status', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah', 'kelompok_ngaji_malam'];
   fields.forEach(f => { if (req.body[f] !== undefined) s[f] = req.body[f]; });
   if (req.body.kamar_id) s.kamar_id = parseInt(req.body.kamar_id);
   saveDB(db); res.json({ message: 'Santri diupdate' });

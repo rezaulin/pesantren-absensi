@@ -229,6 +229,7 @@ tr:hover{background:#f9f9f9}
       <div class="filter-bar">
         <input type="date" id="malamTanggal">
         <select id="malamKamar" onchange="loadAbsenMalam()"><option value="">Semua Kamar</option></select>
+        <select id="malamKelompok" onchange="loadAbsenMalam()"><option value="">Semua Kelompok</option></select>
       </div>
       <div class="absensi-grid" id="malamGrid"></div>
       <button class="btn btn-primary" style="margin-top:.8rem" onclick="simpanAbsenMalam()">Simpan Absen Malam</button>
@@ -251,7 +252,7 @@ tr:hover{background:#f9f9f9}
         <h3 class="section-title" style="margin:0">Data Santri</h3>
         <button class="btn btn-primary btn-sm" onclick="showModal('santri')" id="btnTambahSantri">+ Tambah</button>
       </div>
-      <div class="table-wrap"><table id="santriTable"><thead><tr><th>No</th><th>Nama</th><th>Kamar</th><th>Kls Diniyyah</th><th>Klp Ngaji</th><th>Kls Sekolah</th><th>Bakat</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="santriTable"><thead><tr><th>No</th><th>Nama</th><th>Kamar</th><th>Kls Diniyyah</th><th>Klp Ngaji</th><th>Ngaji Malam</th><th>Kls Sekolah</th><th>Bakat</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <!-- KAMAR -->
@@ -694,13 +695,23 @@ async function loadAbsenMalam(){
   if(!$('malamTanggal').value)$('malamTanggal').value=today;
   const tanggal=$('malamTanggal').value;
   const kamarId=$('malamKamar').value;
+  const kelompokVal=$('malamKelompok').value;
   // Populate kamar dropdown
   const kamarList=await api('/api/kamar');
   if(kamarList&&$('malamKamar').options.length<=1){
     kamarList.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('malamKamar').appendChild(o)});
   }
-  // Fetch santri (filter by kamar if selected)
-  const santri=await api('/api/santri'+(kamarId?'?kamar_id='+kamarId:''));
+  // Populate kelompok ngaji malam dropdown (from all santri)
+  const allSantri=await api('/api/santri');
+  if(allSantri&&$('malamKelompok').options.length<=1){
+    const kelompokSet=new Set(allSantri.map(s=>s.kelompok_ngaji_malam).filter(Boolean));
+    [...kelompokSet].sort().forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;$('malamKelompok').appendChild(o)});
+  }
+  // Fetch santri (filter by kamar and/or kelompok if selected)
+  let santriUrl='/api/santri?';
+  if(kamarId)santriUrl+='kamar_id='+kamarId+'&';
+  if(kelompokVal)santriUrl+='kelompok_ngaji_malam='+encodeURIComponent(kelompokVal)+'&';
+  const santri=await api(santriUrl);
   if(!santri)return;
   // Find or create "Absen Malam" kegiatan
   const kegiatanList=await api('/api/kegiatan');
@@ -718,7 +729,7 @@ async function loadAbsenMalam(){
     const st=ex?ex.status:'H';
     malamData[s.id]=st;
     return '<div class="santri-row"><div><div class="nama">'+(i+1)+'. '+s.nama+'</div><div class="kamar">'+(s.kamar_nama||'-')+'</div></div><div class="status-btns"><div class="status-btn '+(st==='H'?'active-H':'')+'" onclick="setMalamStatus('+s.id+',\'H\',this)">H</div><div class="status-btn '+(st==='A'?'active-A':'')+'" onclick="setMalamStatus('+s.id+',\'A\',this)">A</div></div></div>';
-  }).join('')||'<p style="text-align:center;color:#999;padding:1rem">Tidak ada santri di kamar ini</p>';
+  }).join('')||'<p style="text-align:center;color:#999;padding:1rem">Tidak ada santri sesuai filter</p>';
 }
 function setMalamStatus(id,status,el){
   malamData[id]=status;
@@ -790,7 +801,7 @@ async function simpanAbsenSekolah(){
 async function loadSantri(){
   const data=await api('/api/santri');
   if(!data)return;
-  $('santriTable').querySelector('tbody').innerHTML=data.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+s.nama+'</td><td>'+(s.kamar_nama||'-')+'</td><td>'+(s.kelas_diniyyah||'-')+'</td><td>'+(s.kelompok_ngaji||'-')+'</td><td>'+(s.kelas_sekolah||'-')+'</td><td>'+(s.jenis_bakat||'-')+'</td><td><span style="color:'+(s.status==='aktif'?'green':'red')+'">'+s.status+'</span></td><td>'+(me.role==='admin'?'<button class="btn btn-outline btn-sm" onclick="editSantri('+s.id+')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus(\'santri\','+s.id+')">🗑️</button>':'')+'</td></tr>').join('');
+  $('santriTable').querySelector('tbody').innerHTML=data.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+s.nama+'</td><td>'+(s.kamar_nama||'-')+'</td><td>'+(s.kelas_diniyyah||'-')+'</td><td>'+(s.kelompok_ngaji||'-')+'</td><td>'+(s.kelompok_ngaji_malam||'-')+'</td><td>'+(s.kelas_sekolah||'-')+'</td><td>'+(s.jenis_bakat||'-')+'</td><td><span style="color:'+(s.status==='aktif'?'green':'red')+'">'+s.status+'</span></td><td>'+(me.role==='admin'?'<button class="btn btn-outline btn-sm" onclick="editSantri('+s.id+')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus(\'santri\','+s.id+')">🗑️</button>':'')+'</td></tr>').join('');
   if($('btnTambahSantri'))$('btnTambahSantri').style.display=me.role==='admin'?'':'none';
 }
 function editSantri(id){api('/api/santri').then(data=>{const s=data.find(x=>x.id===id);if(s)showModal('santri',s)})}
@@ -882,7 +893,7 @@ async function loadPengumuman(){
 function showModal(type,editData){
   let html='';
   if(type==='santri'){
-    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div><div class="form-group"><label>Kelas Diniyyah</label><input id="mKelasDiniyyah" value="'+(editData?.kelas_diniyyah||'')+'" placeholder="Contoh: 1A, 2B, 3A"></div><div class="form-group"><label>Kelompok Ngaji</label><input id="mKelompokNgaji" value="'+(editData?.kelompok_ngaji||'')+'" placeholder="Contoh: Juz 1, Tahsin"></div><div class="form-group"><label>Kelas Sekolah Formal</label><input id="mKelasSekolah" value="'+(editData?.kelas_sekolah||'')+'" placeholder="Contoh: 7A, 8B, 9A"></div><div class="form-group"><label>Jenis Bakat</label><input id="mJenisBakat" value="'+(editData?.jenis_bakat||'')+'" placeholder="Contoh: Tahfidz, Kaligrafi"></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
+    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div><div class="form-group"><label>Kelas Diniyyah</label><input id="mKelasDiniyyah" value="'+(editData?.kelas_diniyyah||'')+'" placeholder="Contoh: 1A, 2B, 3A"></div><div class="form-group"><label>Kelompok Ngaji</label><input id="mKelompokNgaji" value="'+(editData?.kelompok_ngaji||'')+'" placeholder="Contoh: Juz 1, Tahsin"></div><div class="form-group"><label>Kelas Sekolah Formal</label><input id="mKelasSekolah" value="'+(editData?.kelas_sekolah||'')+'" placeholder="Contoh: 7A, 8B, 9A"></div><div class="form-group"><label>Jenis Bakat</label><input id="mJenisBakat" value="'+(editData?.jenis_bakat||'')+'" placeholder="Contoh: Tahfidz, Kaligrafi"></div><div class="form-group"><label>Kelompok Ngaji Malam</label><input id="mKelompokNgajiMalam" value="'+(editData?.kelompok_ngaji_malam||'')+'" placeholder="Contoh: Ust. Ahmad, Ust. Hasan"></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
     api('/api/kamar').then(data=>{if(data)data.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;if(editData?.kamar_id===k.id)o.selected=true;$('mKamar').appendChild(o)})});
   } else if(type==='kamar'){
@@ -911,7 +922,7 @@ function showModal(type,editData){
 function closeModal(){$('modalBg').classList.remove('active')}
 
 async function saveSantri(id){
-  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,kelas_diniyyah:$('mKelasDiniyyah').value,kelompok_ngaji:$('mKelompokNgaji').value,kelas_sekolah:$('mKelasSekolah').value,jenis_bakat:$('mJenisBakat').value};
+  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,kelas_diniyyah:$('mKelasDiniyyah').value,kelompok_ngaji:$('mKelompokNgaji').value,kelas_sekolah:$('mKelasSekolah').value,jenis_bakat:$('mJenisBakat').value,kelompok_ngaji_malam:$('mKelompokNgajiMalam').value};
   if(!body.nama)return toast('Nama wajib diisi');
   const res=await api('/api/santri'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
   toast(res.message||'Tersimpan');closeModal();loadSantri();

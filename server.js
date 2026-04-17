@@ -203,6 +203,28 @@ app.delete('/api/pengumuman/:id', authenticate, requireAdmin, (req, res) => {
   res.json({ message: 'Pengumuman dihapus' });
 });
 
+// ── Settings ──────────────────────────────────────────
+app.get('/api/settings', (req, res) => {
+  const data = loadDB();
+  res.json(data.settings || { app_name: 'Pesantren Absensi', logo: '' });
+});
+app.put('/api/settings', authenticate, requireAdmin, (req, res) => {
+  const data = loadDB();
+  data.settings = { ...data.settings, ...req.body };
+  saveDB(data);
+  res.json({ message: 'Pengaturan disimpan', settings: data.settings });
+});
+app.post('/api/settings/logo', authenticate, requireAdmin, (req, res) => {
+  // Accept base64 image
+  const { logo } = req.body;
+  if (!logo) return res.status(400).json({ message: 'Logo wajib' });
+  const data = loadDB();
+  if (!data.settings) data.settings = { app_name: 'Pesantren Absensi' };
+  data.settings.logo = logo;
+  saveDB(data);
+  res.json({ message: 'Logo diupdate' });
+});
+
 // ── Export PDF ──────────────────────────────────────────
 app.get('/api/export/pdf', authenticate, (req, res) => {
   let list = db.absensi;

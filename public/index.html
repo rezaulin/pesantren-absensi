@@ -206,6 +206,32 @@ tr:hover{background:#f9f9f9}
       <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Santri</th><th>Kamar</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="rekapBody"></tbody></table></div>
     </div>
 
+
+    <!-- Pengaturan -->
+    <div class="page" id="page-pengaturan">
+      <h3 class="page-title">Pengaturan Aplikasi</h3>
+      <div style="background:#fff;padding:1.5rem;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+        <div class="form-group">
+          <label>Nama Aplikasi</label>
+          <input id="settingAppName" placeholder="Contoh: Pesantren Al-Falah">
+        </div>
+        <div class="form-group">
+          <label>Logo (klik untuk upload)</label>
+          <div style="display:flex;align-items:center;gap:1rem">
+            <div id="logoPreview" style="width:80px;height:80px;border:2px dashed #ddd;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer" onclick="document.getElementById('logoInput').click()">
+              <span style="font-size:2rem" id="logoPlaceholder">🕌</span>
+            </div>
+            <div>
+              <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="previewLogo(this)">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('logoInput').click()">Pilih Gambar</button>
+              <p style="font-size:.75rem;color:#999;margin-top:.3rem">PNG/JPG, maks 500KB, rekomendasi 200x200px</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:1rem">Simpan Pengaturan</button>
+      </div>
+    </div>
+
     <!-- Pengumuman -->
     <div class="page" id="page-pengumuman">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -254,6 +280,7 @@ async function initApp(){
   if(!token){logout();return}
   me=await api('/api/me');
   if(!me||!me.id){logout();return}
+  loadAppSettings();
   $('loginPage').style.display='none';
   $('app').classList.add('active');
   $('userInfo').textContent=me.nama+' ('+me.role+')';
@@ -273,6 +300,7 @@ function buildNav(){
     items.push({id:'users',icon:'👥',label:'Kelola Pengguna'});
     items.push({id:'rekap',icon:'📋',label:'Rekap Absensi'});
     items.push({id:'pengumuman',icon:'📢',label:'Pengumuman'});
+    items.push({id:'pengaturan',icon:'⚙️',label:'Pengaturan'});
   } else {
     items.push({id:'santri',icon:'👨‍🎓',label:'Data Santri'});
     items.push({id:'rekap',icon:'📋',label:'Rekap Absensi'});
@@ -299,6 +327,7 @@ function navigate(page){
   if(page==='users')loadUsers();
   if(page==='rekap')loadRekap();
   if(page==='pengumuman')loadPengumuman();
+  if(page==='pengaturan')loadPengaturan();
 }
 
 function toggleSidebar(force){
@@ -528,6 +557,7 @@ async function hapus(type,id){
 }
 
 // ── Auto-login ──
+loadAppSettings();
 if(token)initApp();
 
 function exportPDF(){
@@ -548,6 +578,59 @@ function exportPDF(){
       a.download = 'rekap-absensi.pdf';
       a.click();
     });
+}
+
+// ── Pengaturan ──
+async function loadPengaturan(){
+  const s = await api('/api/settings');
+  if(s) $('settingAppName').value = s.app_name || '';
+  if(s && s.logo) {
+    $('logoPreview').innerHTML = '<img src="'+s.logo+'" style="width:100%;height:100%;object-fit:cover">';
+    $('logoPlaceholder').style.display = 'none';
+  }
+}
+function previewLogo(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 500*1024){ toast('Maks 500KB'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    $('logoPreview').innerHTML = '<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">';
+  };
+  reader.readAsDataURL(file);
+}
+async function saveSettings(){
+  const appName = $('settingAppName').value;
+  if(!appName) return toast('Nama wajib diisi');
+  await api('/api/settings',{method:'PUT',body:JSON.stringify({app_name:appName})});
+  // Upload logo if changed
+  const logoImg = $('logoPreview').querySelector('img');
+  if(logoImg && logoImg.src.startsWith('data:')){
+    await api('/api/settings/logo',{method:'POST',body:JSON.stringify({logo:logoImg.src})});
+  }
+  toast('Pengaturan disimpan!');
+  loadAppSettings();
+}
+
+// Load app settings on init
+async function loadAppSettings(){
+  const s = await api('/api/settings');
+  if(s && s.app_name){
+    document.title = s.app_name;
+    // Update login page title
+    const loginTitle = document.querySelector('.login-box h1');
+    if(loginTitle) loginTitle.textContent = s.logo ? '' : '🕌 ' + s.app_name;
+    else {
+      // update navbar title
+    }
+    // Update sidebar title
+    const sidebarTitle = document.querySelector('.sidebar-header span');
+    if(sidebarTitle) sidebarTitle.textContent = (s.logo ? '' : '🕌 ') + s.app_name;
+  }
+  if(s && s.logo){
+    const loginTitle = document.querySelector('.login-box h1');
+    if(loginTitle) loginTitle.innerHTML = '<img src="'+s.logo+'" style="width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:8px">' + (s.app_name||'');
+  }
 }
 </script>
 </body>

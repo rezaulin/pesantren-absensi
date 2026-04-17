@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── JSON Database ──────────────────────────────────────
 function loadDB() {
   if (fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
-  return { users: [], kamar: [], santri: [], absensi: [], pengumuman: [] };
+  return { users: [], kamar: [], santri: [], absensi: [], pengumuman: [], kegiatan: [] };
 }
 function saveDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); }
 function nextId(arr) { return arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1; }
@@ -27,6 +27,17 @@ if (!db.users.find(u => u.username === 'admin')) {
   db.users.push({ id: 1, username: 'admin', password_hash: bcrypt.hashSync('admin123', 10), role: 'admin', nama: 'Administrator', created_at: new Date().toISOString() });
   saveDB(db);
   console.log('Default admin: admin / admin123');
+}
+// Init default kegiatan
+if (!db.kegiatan || db.kegiatan.length === 0) {
+  db.kegiatan = [
+    { id: 1, nama: 'Ngaji Pagi', created_at: new Date().toISOString() },
+    { id: 2, nama: "Ngaji Qur'an Siang", created_at: new Date().toISOString() },
+    { id: 3, nama: 'Bakat', created_at: new Date().toISOString() },
+    { id: 4, nama: 'Madrasah Diniyyah', created_at: new Date().toISOString() },
+    { id: 5, nama: 'Ngaji Malam', created_at: new Date().toISOString() },
+  ];
+  saveDB(db);
 }
 
 // ── Auth ───────────────────────────────────────────────
@@ -46,12 +57,10 @@ app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   const user = db.users.find(u => u.username === username);
   if (!user || !bcrypt.compareSync(password, user.password_hash))
-    return res.status(401).json({ message: 'Username atau password salah' });
-  const token = jwt.sign({ id: user.id, username: user.username, role: user.role, nama: user.nama }, JWT_SECRET, { expiresIn: '24h' });
+    return res.status(401).json({ message: 'Username/password salah' });
+  const token = jwt.sign({ id: user.id, username: user.username, role: user.role, nama: user.nama }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, user: { id: user.id, username: user.username, role: user.role, nama: user.nama } });
 });
-
-app.get('/api/me', authenticate, (req, res) => res.json(req.user));
 
 // ── Dashboard ──────────────────────────────────────────
 app.get('/api/dashboard', authenticate, (req, res) => {
@@ -59,53 +68,61 @@ app.get('/api/dashboard', authenticate, (req, res) => {
   const hadir = db.absensi.filter(a => a.tanggal === today && a.status === 'H').length;
   const izin = db.absensi.filter(a => a.tanggal === today && (a.status === 'I' || a.status === 'S')).length;
   const alfa = db.absensi.filter(a => a.tanggal === today && a.status === 'A').length;
-  res.json({ totalSantri: db.santri.filter(s => s.status === 'aktif').length, hadirHariIni: hadir, izinHariIni: izin, alfaHariIni: alfa });
+  res.json({
+    total_santri: db.santri.filter(s => s.status === 'aktif').length,
+    total_kamar: db.kamar.length,
+    hadir_hari_ini: hadir,
+    izin_sakit: izin,
+    alfa: alfa,
+    pengumuman: db.pengumuman.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3)
+  });
 });
 
 // ── Users ──────────────────────────────────────────────
 app.get('/api/users', authenticate, requireAdmin, (req, res) => {
-  res.json(db.users.map(u => ({ id: u.id, username: u.username, role: u.role, nama: u.nama, created_at: u.created_at })));
+  res.json(db.users.map(u => ({ id: u.id, username: u.username, nama: u.nama, role: u.role, created_at: u.created_at })));
 });
 app.post('/api/users', authenticate, requireAdmin, (req, res) => {
   const { username, password, role, nama } = req.body;
-  if (!username || !password || !nama) return res.status(400).json({ message: 'Field wajib' });
+  if (!username || !password || !nama) return res.status(400).json({ message: 'Semua field wajib' });
   if (db.users.find(u => u.username === username)) return res.status(400).json({ message: 'Username sudah ada' });
   const user = { id: nextId(db.users), username, password_hash: bcrypt.hashSync(password, 10), role: role || 'ustadz', nama, created_at: new Date().toISOString() };
-  db.users.push(user); saveDB(db);
-  res.json({ id: user.id, username: user.username, role: user.role, nama: user.nama });
+  db.users.push(user); saveDB(db); res.json({ message: 'User ditambahkan', user: { id: user.id, username: user.username, nama: user.nama, role: user.role } });
 });
 app.put('/api/users/:id', authenticate, requireAdmin, (req, res) => {
   const user = db.users.find(u => u.id == req.params.id);
-  if (!user) return res.status(404).json({ message: 'User tidak ada' });
-  if (req.body.nama) user.nama = req.body.nama;
-  if (req.body.role) user.role = req.body.role;
-  if (req.body.password) user.password_hash = bcrypt.hashSync(req.body.password, 10);
+  if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+  const { username, password, role, nama } = req.body;
+  if (username) user.username = username;
+  if (nama) user.nama = nama;
+  if (role) user.role = role;
+  if (password) user.password_hash = bcrypt.hashSync(password, 10);
   saveDB(db); res.json({ message: 'User diupdate' });
 });
 app.delete('/api/users/:id', authenticate, requireAdmin, (req, res) => {
-  if (req.params.id == req.user.id) return res.status(400).json({ message: 'Tidak bisa hapus diri sendiri' });
+  if (req.user.id == req.params.id) return res.status(400).json({ message: 'Tidak bisa hapus diri sendiri' });
   db.users = db.users.filter(u => u.id != req.params.id); saveDB(db);
   res.json({ message: 'User dihapus' });
 });
 
 // ── Kamar ──────────────────────────────────────────────
 app.get('/api/kamar', authenticate, (req, res) => {
-  res.json(db.kamar.map(k => ({ ...k, jumlah_santri: db.santri.filter(s => s.kamar_id === k.id && s.status === 'aktif').length })));
+  res.json(db.kamar.map(k => ({
+    ...k, jumlah_santri: db.santri.filter(s => s.kamar_id === k.id && s.status === 'aktif').length
+  })));
 });
 app.post('/api/kamar', authenticate, requireAdmin, (req, res) => {
   const { nama, kapasitas, pengurus } = req.body;
   if (!nama) return res.status(400).json({ message: 'Nama wajib' });
-  const k = { id: nextId(db.kamar), nama, kapasitas: kapasitas || 0, pengurus: pengurus || '' };
+  const k = { id: nextId(db.kamar), nama, kapasitas: kapasitas || 10, pengurus: pengurus || '' };
   db.kamar.push(k); saveDB(db); res.json(k);
 });
 app.put('/api/kamar/:id', authenticate, requireAdmin, (req, res) => {
   const k = db.kamar.find(x => x.id == req.params.id);
-  if (!k) return res.status(404).json({ message: 'Kamar tidak ada' });
+  if (!k) return res.status(404).json({ message: 'Kamar tidak ditemukan' });
   Object.assign(k, req.body); saveDB(db); res.json({ message: 'Kamar diupdate' });
 });
 app.delete('/api/kamar/:id', authenticate, requireAdmin, (req, res) => {
-  const hasSantri = db.santri.some(s => s.kamar_id == req.params.id && s.status === 'aktif');
-  if (hasSantri) return res.status(400).json({ message: 'Kamar masih ada santri' });
   db.kamar = db.kamar.filter(k => k.id != req.params.id); saveDB(db);
   res.json({ message: 'Kamar dihapus' });
 });
@@ -114,39 +131,56 @@ app.delete('/api/kamar/:id', authenticate, requireAdmin, (req, res) => {
 app.get('/api/santri', authenticate, (req, res) => {
   let list = db.santri;
   if (req.query.kamar_id) list = list.filter(s => s.kamar_id == req.query.kamar_id);
-  if (req.query.status) list = list.filter(s => s.status === req.query.status);
-  else list = list.filter(s => s.status === 'aktif');
   res.json(list.map(s => {
     const k = db.kamar.find(x => x.id === s.kamar_id);
     return { ...s, kamar_nama: k ? k.nama : '-' };
-  }).sort((a, b) => a.nama.localeCompare(b.nama)));
-});
-app.get('/api/santri/:id', authenticate, (req, res) => {
-  const s = db.santri.find(x => x.id == req.params.id);
-  if (!s) return res.status(404).json({ message: 'Santri tidak ada' });
-  const k = db.kamar.find(x => x.id === s.kamar_id);
-  res.json({ ...s, kamar_nama: k ? k.nama : '-' });
+  }));
 });
 app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
   const { nama, kamar_id, status } = req.body;
-  if (!nama) return res.status(400).json({ message: 'Nama wajib' });
-  const s = { id: nextId(db.santri), nama, kamar_id: kamar_id || null, status: status || 'aktif', created_at: new Date().toISOString() };
+  if (!nama || !kamar_id) return res.status(400).json({ message: 'Nama & kamar wajib' });
+  const s = { id: nextId(db.santri), nama, kamar_id: parseInt(kamar_id), status: status || 'aktif', created_at: new Date().toISOString() };
   db.santri.push(s); saveDB(db); res.json(s);
 });
 app.put('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
   const s = db.santri.find(x => x.id == req.params.id);
-  if (!s) return res.status(404).json({ message: 'Santri tidak ada' });
-  Object.assign(s, req.body); saveDB(db); res.json({ message: 'Santri diupdate' });
+  if (!s) return res.status(404).json({ message: 'Santri tidak ditemukan' });
+  if (req.body.nama) s.nama = req.body.nama;
+  if (req.body.kamar_id) s.kamar_id = parseInt(req.body.kamar_id);
+  if (req.body.status) s.status = req.body.status;
+  saveDB(db); res.json({ message: 'Santri diupdate' });
 });
 app.delete('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
   db.santri = db.santri.filter(s => s.id != req.params.id); saveDB(db);
   res.json({ message: 'Santri dihapus' });
 });
 
+// ── Kegiatan ───────────────────────────────────────────
+app.get('/api/kegiatan', authenticate, (req, res) => {
+  res.json(db.kegiatan);
+});
+app.post('/api/kegiatan', authenticate, requireAdmin, (req, res) => {
+  const { nama } = req.body;
+  if (!nama) return res.status(400).json({ message: 'Nama kegiatan wajib' });
+  const k = { id: nextId(db.kegiatan), nama, created_at: new Date().toISOString() };
+  db.kegiatan.push(k); saveDB(db); res.json(k);
+});
+app.put('/api/kegiatan/:id', authenticate, requireAdmin, (req, res) => {
+  const k = db.kegiatan.find(x => x.id == req.params.id);
+  if (!k) return res.status(404).json({ message: 'Kegiatan tidak ditemukan' });
+  if (req.body.nama) k.nama = req.body.nama;
+  saveDB(db); res.json({ message: 'Kegiatan diupdate' });
+});
+app.delete('/api/kegiatan/:id', authenticate, requireAdmin, (req, res) => {
+  db.kegiatan = db.kegiatan.filter(k => k.id != req.params.id); saveDB(db);
+  res.json({ message: 'Kegiatan dihapus' });
+});
+
 // ── Absensi ────────────────────────────────────────────
 app.get('/api/absensi', authenticate, (req, res) => {
   let list = db.absensi;
   if (req.query.tanggal) list = list.filter(a => a.tanggal === req.query.tanggal);
+  if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
   if (req.query.kamar_id) {
     const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
     list = list.filter(a => santriIds.includes(a.santri_id));
@@ -154,17 +188,18 @@ app.get('/api/absensi', authenticate, (req, res) => {
   res.json(list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);
     const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+    const kg = db.kegiatan.find(x => x.id === a.kegiatan_id);
     const u = db.users.find(x => x.id === a.recorded_by);
-    return { ...a, santri_nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-', recorded_by_nama: u ? u.nama : '-' };
+    return { ...a, santri_nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-', kegiatan_nama: kg ? kg.nama : '-', recorded_by_nama: u ? u.nama : '-' };
   }));
 });
 app.post('/api/absensi/bulk', authenticate, (req, res) => {
-  const { tanggal, items } = req.body;
-  if (!tanggal || !items) return res.status(400).json({ message: 'Data tidak lengkap' });
+  const { tanggal, kegiatan_id, items } = req.body;
+  if (!tanggal || !kegiatan_id || !items) return res.status(400).json({ message: 'Data tidak lengkap (tanggal, kegiatan_id, items wajib)' });
   items.forEach(item => {
-    const existing = db.absensi.find(a => a.santri_id === item.santri_id && a.tanggal === tanggal);
+    const existing = db.absensi.find(a => a.santri_id === item.santri_id && a.tanggal === tanggal && a.kegiatan_id == kegiatan_id);
     if (existing) { existing.status = item.status; existing.keterangan = item.keterangan || ''; existing.recorded_by = req.user.id; }
-    else db.absensi.push({ id: nextId(db.absensi), santri_id: item.santri_id, tanggal, status: item.status, keterangan: item.keterangan || '', recorded_by: req.user.id, created_at: new Date().toISOString() });
+    else db.absensi.push({ id: nextId(db.absensi), santri_id: item.santri_id, kegiatan_id: parseInt(kegiatan_id), tanggal, status: item.status, keterangan: item.keterangan || '', recorded_by: req.user.id, created_at: new Date().toISOString() });
   });
   saveDB(db); res.json({ message: 'Absensi tersimpan' });
 });
@@ -174,6 +209,7 @@ app.get('/api/rekap', authenticate, (req, res) => {
   let list = db.absensi;
   if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
   if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
+  if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
   if (req.query.kamar_id) {
     const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
     list = list.filter(a => santriIds.includes(a.santri_id));
@@ -181,7 +217,8 @@ app.get('/api/rekap', authenticate, (req, res) => {
   res.json(list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);
     const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
-    return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-', status: a.status, keterangan: a.keterangan };
+    const kg = db.kegiatan.find(x => x.id === a.kegiatan_id);
+    return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-', kegiatan_nama: kg ? kg.nama : '-', status: a.status, keterangan: a.keterangan };
   }).sort((a, b) => b.tanggal.localeCompare(a.tanggal)));
 });
 
@@ -215,7 +252,6 @@ app.put('/api/settings', authenticate, requireAdmin, (req, res) => {
   res.json({ message: 'Pengaturan disimpan', settings: data.settings });
 });
 app.post('/api/settings/logo', authenticate, requireAdmin, (req, res) => {
-  // Accept base64 image
   const { logo } = req.body;
   if (!logo) return res.status(400).json({ message: 'Logo wajib' });
   const data = loadDB();
@@ -230,6 +266,7 @@ app.get('/api/export/pdf', authenticate, (req, res) => {
   let list = db.absensi;
   if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
   if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
+  if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
   if (req.query.kamar_id) {
     const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
     list = list.filter(a => santriIds.includes(a.santri_id));
@@ -238,7 +275,8 @@ app.get('/api/export/pdf', authenticate, (req, res) => {
   const data = list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);
     const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
-    return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar: k ? k.nama : '-', status: a.status, keterangan: a.keterangan };
+    const kg = db.kegiatan.find(x => x.id === a.kegiatan_id);
+    return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar: k ? k.nama : '-', kegiatan: kg ? kg.nama : '-', status: a.status, keterangan: a.keterangan };
   }).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
 
   const statusMap = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alfa' };
@@ -249,50 +287,51 @@ app.get('/api/export/pdf', authenticate, (req, res) => {
   doc.pipe(res);
 
   // Header
+  const data_settings = loadDB();
+  const appName = (data_settings.settings && data_settings.settings.app_name) || 'Pesantren';
   doc.fontSize(18).font('Helvetica-Bold').text('REKAP ABSENSI SANTRI', { align: 'center' });
-  doc.fontSize(10).font('Helvetica').text('Pesantren', { align: 'center' });
+  doc.fontSize(10).font('Helvetica').text(appName, { align: 'center' });
   doc.moveDown(0.5);
   const filterText = [];
   if (req.query.dari) filterText.push(`Dari: ${req.query.dari}`);
   if (req.query.sampai) filterText.push(`Sampai: ${req.query.sampai}`);
+  if (req.query.kegiatan_id) {
+    const kg = db.kegiatan.find(x => x.id == req.query.kegiatan_id);
+    if (kg) filterText.push(`Kegiatan: ${kg.nama}`);
+  }
   if (filterText.length) doc.fontSize(9).text(filterText.join(' | '), { align: 'center' });
   doc.moveDown(1);
 
-  // Table
-  const tableTop = doc.y;
-  const colX = [40, 120, 270, 370, 450];
-  const headers = ['Tanggal', 'Nama Santri', 'Kamar', 'Status', 'Keterangan'];
-  const colW = [80, 150, 100, 80, 120];
+  // Table header
+  const colWidths = [70, 120, 80, 110, 60, 100];
+  const headers = ['Tanggal', 'Santri', 'Kamar', 'Kegiatan', 'Status', 'Keterangan'];
+  let y = doc.y;
+  doc.fontSize(8).font('Helvetica-Bold');
+  let x = 40;
+  headers.forEach((h, i) => { doc.text(h, x, y, { width: colWidths[i] }); x += colWidths[i]; });
+  doc.moveTo(40, y + 15).lineTo(550, y + 15).stroke();
+  y += 20;
 
-  // Header row
-  doc.font('Helvetica-Bold').fontSize(9);
-  headers.forEach((h, i) => doc.text(h, colX[i], tableTop, { width: colW[i] }));
-  doc.moveTo(40, tableTop + 15).lineTo(555, tableTop + 15).stroke();
-
-  // Data rows
+  // Table rows
   doc.font('Helvetica').fontSize(8);
-  let y = tableTop + 20;
   data.forEach((row, idx) => {
     if (y > 750) { doc.addPage(); y = 40; }
-    if (idx % 2 === 0) { doc.rect(38, y - 3, 520, 16).fill('#f5f5f5').fillColor('black'); }
-    doc.text(row.tanggal, colX[0], y, { width: colW[0] });
-    doc.text(row.nama, colX[1], y, { width: colW[1] });
-    doc.text(row.kamar, colX[2], y, { width: colW[2] });
-    doc.text(statusMap[row.status] || row.status, colX[3], y, { width: colW[3] });
-    doc.text(row.keterangan || '-', colX[4], y, { width: colW[4] });
-    y += 18;
+    x = 40;
+    const rowData = [row.tanggal, row.nama, row.kamar, row.kegiatan, statusMap[row.status] || row.status, row.keterangan || '-'];
+    rowData.forEach((cell, i) => { doc.text(String(cell), x, y, { width: colWidths[i] }); x += colWidths[i]; });
+    y += 16;
   });
 
-  // Footer
-  doc.moveTo(40, y + 5).lineTo(555, y + 5).stroke();
-  doc.fontSize(8).text(`Total: ${data.length} data | Dibuat: ${new Date().toLocaleString('id-ID')}`, 40, y + 10, { align: 'center' });
+  // Summary
+  doc.moveDown(2);
+  doc.fontSize(9).font('Helvetica-Bold').text('Ringkasan:', 40, y + 20);
+  const hadir = data.filter(r => r.status === 'H').length;
+  const izin = data.filter(r => r.status === 'I').length;
+  const sakit = data.filter(r => r.status === 'S').length;
+  const alfa = data.filter(r => r.status === 'A').length;
+  doc.font('Helvetica').text(`Hadir: ${hadir} | Izin: ${izin} | Sakit: ${sakit} | Alfa: ${alfa} | Total: ${data.length}`, 40);
 
   doc.end();
 });
 
-// ── Start ──────────────────────────────────────────────
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.listen(PORT, () => {
-  console.log(`Server: http://localhost:${PORT}`);
-  console.log('Login: admin / admin123');
-});
+app.listen(PORT, () => console.log(`Server jalan di http://localhost:${PORT}`));

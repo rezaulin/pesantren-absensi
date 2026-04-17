@@ -366,6 +366,52 @@ app.delete('/api/pelanggaran/:id', authenticate, requireAdmin, (req, res) => {
   res.json({ message: 'Pelanggaran dihapus' });
 });
 
+// ── Catatan Guru ────────────────────────────────────────
+app.get('/api/catatan', authenticate, (req, res) => {
+  let list = db.catatan_guru || [];
+  // Wali: only see notes for their children
+  if (req.user.role === 'wali') {
+    const anakIds = db.santri.filter(s => s.wali_user_id === req.user.id).map(s => s.id);
+    list = list.filter(c => anakIds.includes(c.santri_id));
+  }
+  if (req.query.santri_id) list = list.filter(c => c.santri_id == req.query.santri_id);
+  if (req.query.kategori) list = list.filter(c => c.kategori === req.query.kategori);
+  if (req.query.dari) list = list.filter(c => c.tanggal >= req.query.dari);
+  if (req.query.sampai) list = list.filter(c => c.tanggal <= req.query.sampai);
+  res.json(list.map(c => {
+    const s = db.santri.find(x => x.id === c.santri_id);
+    const u = db.users.find(x => x.id === c.created_by);
+    return { ...c, santri_nama: s ? s.nama : '-', guru_nama: u ? u.nama : '-' };
+  }).sort((a, b) => b.tanggal.localeCompare(a.tanggal)));
+});
+app.post('/api/catatan', authenticate, (req, res) => {
+  if (req.user.role === 'wali') return res.status(403).json({ message: 'Wali tidak bisa membuat catatan' });
+  const { santri_id, tanggal, judul, isi, kategori } = req.body;
+  if (!santri_id || !tanggal || !isi) return res.status(400).json({ message: 'Santri, tanggal & isi wajib' });
+  if (!db.catatan_guru) db.catatan_guru = [];
+  const c = {
+    id: nextId(db.catatan_guru), santri_id: parseInt(santri_id), tanggal,
+    judul: judul || '', isi, kategori: kategori || 'lainnya',
+    created_by: req.user.id, created_at: new Date().toISOString()
+  };
+  db.catatan_guru.push(c); saveDB(db); res.json(c);
+});
+app.put('/api/catatan/:id', authenticate, (req, res) => {
+  if (req.user.role === 'wali') return res.status(403).json({ message: 'Wali tidak bisa mengubah catatan' });
+  if (!db.catatan_guru) return res.status(404).json({ message: 'Tidak ditemukan' });
+  const c = db.catatan_guru.find(x => x.id == req.params.id);
+  if (!c) return res.status(404).json({ message: 'Tidak ditemukan' });
+  ['santri_id', 'tanggal', 'judul', 'isi', 'kategori'].forEach(f => { if (req.body[f] !== undefined) c[f] = req.body[f]; });
+  if (req.body.santri_id) c.santri_id = parseInt(req.body.santri_id);
+  saveDB(db); res.json({ message: 'Catatan diupdate' });
+});
+app.delete('/api/catatan/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Hanya admin' });
+  if (!db.catatan_guru) return res.status(404).json({ message: 'Tidak ditemukan' });
+  db.catatan_guru = db.catatan_guru.filter(c => c.id != req.params.id);
+  saveDB(db); res.json({ message: 'Catatan dihapus' });
+});
+
 // ── Raport Santri ───────────────────────────────────────
 app.get('/api/raport/:santri_id', authenticate, (req, res) => {
   const santri = db.santri.find(s => s.id == req.params.santri_id);
@@ -377,6 +423,9 @@ app.get('/api/raport/:santri_id', authenticate, (req, res) => {
   let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
   if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
   if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
+  let catatanList = (db.catatan_guru || []).filter(c => c.santri_id === santri.id);
+  if (req.query.dari) catatanList = catatanList.filter(c => c.tanggal >= req.query.dari);
+  if (req.query.sampai) catatanList = catatanList.filter(c => c.tanggal <= req.query.sampai);
   // Group absensi by kegiatan
   const rekap = {};
   absensiList.forEach(a => {
@@ -390,7 +439,11 @@ app.get('/api/raport/:santri_id', authenticate, (req, res) => {
     santri: { ...santri, kamar_nama: kamar ? kamar.nama : '-' },
     periode: { dari: req.query.dari || '-', sampai: req.query.sampai || '-' },
     rekap,
-    pelanggaran: pelanggaranList.sort((a, b) => b.tanggal.localeCompare(a.tanggal))
+    pelanggaran: pelanggaranList.sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
+    catatan_guru: catatanList.map(c => {
+      const u = db.users.find(x => x.id === c.created_by);
+      return { ...c, guru_nama: u ? u.nama : '-' };
+    }).sort((a, b) => b.tanggal.localeCompare(a.tanggal))
   });
 });
 
@@ -405,6 +458,9 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
   if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
   if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
+  let catatanList = (db.catatan_guru || []).filter(c => c.santri_id === santri.id);
+  if (req.query.dari) catatanList = catatanList.filter(c => c.tanggal >= req.query.dari);
+  if (req.query.sampai) catatanList = catatanList.filter(c => c.tanggal <= req.query.sampai);
   // Group by kegiatan
   const rekap = {};
   absensiList.forEach(a => {
@@ -469,6 +525,21 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
     });
   } else {
     doc.fontSize(10).font('Helvetica').text('Tidak ada pelanggaran.', 40);
+  }
+  doc.moveDown(1);
+  // Catatan Guru
+  doc.fontSize(12).font('Helvetica-Bold').text('Catatan Guru', 40);
+  doc.moveDown(0.5);
+  if (catatanList.length) {
+    doc.fontSize(8).font('Helvetica');
+    catatanList.forEach((c, i) => {
+      const guru = db.users.find(u => u.id === c.created_by);
+      doc.font('Helvetica-Bold').text((i + 1) + '. [' + c.tanggal + '] ' + (c.judul || c.kategori) + ' — oleh ' + (guru ? guru.nama : '-'), 40, doc.y, { width: 500 });
+      doc.font('Helvetica').text(c.isi, 55, doc.y, { width: 485 });
+      doc.moveDown(0.4);
+    });
+  } else {
+    doc.fontSize(10).font('Helvetica').text('Tidak ada catatan.', 40);
   }
   doc.end();
 });

@@ -370,6 +370,27 @@ tr:hover{background:#f9f9f9}
       <div class="table-wrap"><table><thead><tr><th>No</th><th>Tanggal</th><th>Santri</th><th>Jenis</th><th>Keterangan</th><th>Sanksi</th><th>Aksi</th></tr></thead><tbody id="pelanggaranBody"></tbody></table></div>
     </div>
 
+    <!-- CATATAN GURU -->
+    <div class="page" id="page-catatan">
+      <h3 class="section-title">Catatan Guru</h3>
+      <div style="margin-bottom:1rem">
+        <button class="btn btn-primary btn-sm" onclick="showModal('catatan')" id="btnTambahCatatan">+ Tambah Catatan</button>
+      </div>
+      <div class="filter-bar">
+        <select id="catatanFilterSantri" onchange="loadCatatan()"><option value="">Semua Santri</option></select>
+        <select id="catatanFilterKategori" onchange="loadCatatan()">
+          <option value="">Semua Kategori</option>
+          <option value="perilaku">Perilaku</option>
+          <option value="akademik">Akademik</option>
+          <option value="kesehatan">Kesehatan</option>
+          <option value="lainnya">Lainnya</option>
+        </select>
+        <input type="date" id="catatanDari" onchange="loadCatatan()">
+        <input type="date" id="catatanSampai" onchange="loadCatatan()">
+      </div>
+      <div id="catatanList"></div>
+    </div>
+
     <!-- RAPORT SANTRI -->
     <div class="page" id="page-raport">
       <h3 class="section-title">Raport Santri</h3>
@@ -414,6 +435,22 @@ tr:hover{background:#f9f9f9}
         <button class="btn btn-primary btn-sm" onclick="loadWaliRekap()">Filter</button>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Anak</th><th>Kamar</th><th>Kegiatan</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="waliRekapBody"></tbody></table></div>
+    </div>
+
+    <!-- WALI CATATAN GURU -->
+    <div class="page" id="page-walicatatan">
+      <h3 class="section-title">Catatan Guru untuk Anak</h3>
+      <div class="filter-bar">
+        <select id="waliCatatanAnak" onchange="loadWaliCatatan()"><option value="">Semua Anak</option></select>
+        <select id="waliCatatanKategori" onchange="loadWaliCatatan()">
+          <option value="">Semua Kategori</option>
+          <option value="perilaku">Perilaku</option>
+          <option value="akademik">Akademik</option>
+          <option value="kesehatan">Kesehatan</option>
+          <option value="lainnya">Lainnya</option>
+        </select>
+      </div>
+      <div id="waliCatatanList"></div>
     </div>
 
   </div><!-- /content -->
@@ -502,6 +539,7 @@ function buildNav(){
     {id:'laporan',icon:'📈',label:'Laporan'},
     {id:'pengumuman',icon:'📢',label:'Pengumuman'},
     {id:'pelanggaran',icon:'⚠️',label:'Pelanggaran'},
+    {id:'catatan',icon:'📝',label:'Catatan Guru'},
     {id:'raport',icon:'📜',label:'Raport Santri'},
     {id:'pengaturan',icon:'⚙️',label:'Pengaturan'},
   ];
@@ -510,13 +548,14 @@ function buildNav(){
     const waliItems=[
       {id:'home',icon:'🏠',label:'Beranda'},
       {id:'walirekap',icon:'📋',label:'Rekap Absensi Anak'},
+      {id:'walicatatan',icon:'📝',label:'Catatan Guru'},
       {id:'pengumuman',icon:'📢',label:'Pengumuman'},
       {id:'logout',icon:'🚪',label:'Keluar'},
     ];
     renderNavList(waliItems);
   } else if(me.role!=='admin'){
     // ustadz only sees limited items
-    const allowed=['home','absensi','santri','rekap','absenmalam','absensekolah','pengumuman','raport','pelanggaran'];
+    const allowed=['home','absensi','santri','rekap','absenmalam','absensekolah','pengumuman','raport','pelanggaran','catatan'];
     const filtered=items.filter(i=>allowed.includes(i.id));
     filtered.push({id:'logout',icon:'🚪',label:'Keluar'});
     renderNavList(filtered);
@@ -544,6 +583,7 @@ function buildGridMenu(){
     {id:'users',icon:'👥',label:'Pengguna',highlight:false},
     {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
     {id:'pelanggaran',icon:'⚠️',label:'Pelanggaran',highlight:false},
+    {id:'catatan',icon:'📝',label:'Catatan Guru',highlight:false},
     {id:'raport',icon:'📜',label:'Raport Santri',highlight:true},
     {id:'pengaturan',icon:'⚙️',label:'Pengaturan',highlight:false},
     {id:'exportpdf',icon:'📥',label:'Export PDF',highlight:true},
@@ -554,10 +594,12 @@ function buildGridMenu(){
     {id:'absensekolah',icon:'🏫',label:'Absen Sekolah',highlight:true},
     {id:'santri',icon:'👨‍🎓',label:'Data Santri',highlight:false},
     {id:'rekap',icon:'📋',label:'Rekap',highlight:false},
+    {id:'catatan',icon:'📝',label:'Catatan Guru',highlight:false},
     {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
   ];
   const waliMenu=[
     {id:'walirekap',icon:'📋',label:'Rekap Absensi',highlight:true},
+    {id:'walicatatan',icon:'📝',label:'Catatan Guru',highlight:false},
     {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
   ];
   const menu=me.role==='admin'?adminMenu:me.role==='wali'?waliMenu:ustadzMenu;
@@ -609,6 +651,8 @@ function loadPageData(page){
   if(page==='sensus')loadSensus();
   if(page==='laporan')loadLaporan();
   if(page==='walirekap')loadWaliRekap();
+  if(page==='catatan')loadCatatan();
+  if(page==='walicatatan')loadWaliCatatan();
 }
 
 function toggleSidebar(force){
@@ -959,6 +1003,12 @@ function showModal(type,editData){
     html='<h3>'+(pel?'Edit':'Tambah')+' Pelanggaran</h3><div class=\"form-group\"><label>Tanggal</label><input type=\"date\" id=\"mPelTanggal\" value=\"'+(pel?.tanggal||new Date().toISOString().slice(0,10))+'\"></div><div class=\"form-group\"><label>Santri</label><select id=\"mPelSantri\"></select></div><div class=\"form-group\"><label>Jenis Pelanggaran</label><input id=\"mPelJenis\" value=\"'+(pel?.jenis||'')+'\" placeholder=\"Contoh: Terlambat, Bolos, Melawan\"></div><div class=\"form-group\"><label>Keterangan</label><input id=\"mPelKeterangan\" value=\"'+(pel?.keterangan||'')+'\" placeholder=\"Detail pelanggaran\"></div><div class=\"form-group\"><label>Sanksi</label><input id=\"mPelSanksi\" value=\"'+(pel?.sanksi||'')+'\" placeholder=\"Contoh: Teguran, Skorsing\"></div><button class=\"btn btn-primary\" onclick=\"savePelanggaran('+(pel?.id||'')+')\">Simpan</button><button class=\"btn btn-outline\" onclick=\"closeModal()\">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
     api('/api/santri').then(data=>{if(data)data.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nama;if(pel?.santri_id===s.id)o.selected=true;$('mPelSantri').appendChild(o)})});
+  } else if(type==='catatan'){
+    let ct=null;
+    if(editData)ct=editData;
+    html='<h3>'+(ct?'Edit':'Tambah')+' Catatan Guru</h3><div class="form-group"><label>Tanggal</label><input type="date" id="mCatTanggal" value="'+(ct?.tanggal||new Date().toISOString().slice(0,10))+'"></div><div class="form-group"><label>Santri</label><select id="mCatSantri"></select></div><div class="form-group"><label>Kategori</label><select id="mCatKategori"><option value="perilaku" '+(ct?.kategori==='perilaku'?'selected':'')+'>Perilaku</option><option value="akademik" '+(ct?.kategori==='akademik'?'selected':'')+'>Akademik</option><option value="kesehatan" '+(ct?.kategori==='kesehatan'?'selected':'')+'>Kesehatan</option><option value="lainnya" '+(ct?.kategori==='lainnya'||!ct?'selected':'')+'>Lainnya</option></select></div><div class="form-group"><label>Judul (opsional)</label><input id="mCatJudul" value="'+(ct?.judul||'')+'" placeholder="Contoh: Perkembangan Hafalan"></div><div class="form-group"><label>Isi Catatan</label><textarea id="mCatIsi" rows="4" placeholder="Tulis catatan tentang santri...">'+(ct?.isi||'')+'</textarea></div><button class="btn btn-primary" onclick="saveCatatan('+(ct?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
+    $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
+    api('/api/santri').then(data=>{if(data)data.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nama;if(ct?.santri_id===s.id)o.selected=true;$('mCatSantri').appendChild(o)})});
   } else if(type==='kegiatan'){
     let kd=null;
     if(editData&&typeof editData==='string')try{kd=JSON.parse(decodeURIComponent(editData))}catch(e){}
@@ -1032,6 +1082,12 @@ async function savePelanggaran(id){
   const res=await api('/api/pelanggaran'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
   toast(res.message||'Tersimpan');closeModal();loadPelanggaran();
 }
+async function saveCatatan(id){
+  const body={santri_id:parseInt($('mCatSantri').value),tanggal:$('mCatTanggal').value,kategori:$('mCatKategori').value,judul:$('mCatJudul').value,isi:$('mCatIsi').value};
+  if(!body.santri_id||!body.tanggal||!body.isi)return toast('Santri, tanggal & isi catatan wajib');
+  const res=await api('/api/catatan'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
+  toast(res.message||'Tersimpan');closeModal();loadCatatan();
+}
 
 // Raport Santri
 async function loadRaportForm(){
@@ -1077,7 +1133,16 @@ async function loadRaport(){
     d.pelanggaran.forEach((p,i)=>{html+='<tr><td>'+(i+1)+'</td><td>'+p.tanggal+'</td><td>'+p.jenis+'</td><td>'+(p.keterangan||'-')+'</td><td>'+(p.sanksi||'-')+'</td></tr>'});
     html+='</tbody></table></div>';
   }else{
-    html+='<p style=\"color:#999;font-size:.85rem\">Tidak ada pelanggaran</p>';
+    html+='<p style=\\\"color:#999;font-size:.85rem\\\">Tidak ada pelanggaran</p>';
+  }
+  // Catatan Guru
+  html+='<div class=\\\"section-title\\\">Catatan Guru</div>';
+  if(d.catatan_guru&&d.catatan_guru.length){
+    d.catatan_guru.forEach(c=>{
+      html+='<div style=\\\"background:#f9f9f9;padding:.8rem;border-radius:8px;margin-bottom:.5rem\\\"><div style=\\\"font-size:.8rem;color:#888\\\">['+c.tanggal+'] '+(c.judul||c.kategori)+' — oleh '+c.guru_nama+'</div><p style=\\\"font-size:.85rem;margin:.3rem 0 0\\\">'+c.isi+'</p></div>';
+    });
+  }else{
+    html+='<p style=\\\"color:#999;font-size:.85rem\\\">Tidak ada catatan</p>';
   }
   $('raportContent').innerHTML=html;
 }
@@ -1153,6 +1218,54 @@ async function loadAppSettings(){
     if(s.background){document.documentElement.style.setProperty('--login-bg','url('+s.background+')');$('loginPage').style.backgroundSize='cover';$('loginPage').style.backgroundPosition='center'}
     }
   }catch(e){}
+}
+
+// ── Catatan Guru ──
+async function loadCatatan(){
+  // Populate santri filter
+  const allSantri=await api('/api/santri');
+  if(allSantri&&$('catatanFilterSantri').options.length<=1){
+    allSantri.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nama;$('catatanFilterSantri').appendChild(o)});
+  }
+  const params=new URLSearchParams();
+  const santriId=$('catatanFilterSantri')?.value;
+  const kategori=$('catatanFilterKategori')?.value;
+  const dari=$('catatanDari')?.value;
+  const sampai=$('catatanSampai')?.value;
+  if(santriId)params.set('santri_id',santriId);
+  if(kategori)params.set('kategori',kategori);
+  if(dari)params.set('dari',dari);
+  if(sampai)params.set('sampai',sampai);
+  const data=await api('/api/catatan?'+params);
+  if(!data)return;
+  const kategoriIcon={perilaku:'⚠️',akademik:'📚',kesehatan:'🏥',lainnya:'📝'};
+  $('catatanList').innerHTML=data.length?data.map(c=>'<div style="background:#fff;border-radius:12px;padding:1rem;margin-bottom:.7rem;box-shadow:0 1px 4px rgba(0,0,0,.08)"><div style="display:flex;justify-content:space-between;align-items:start"><div><strong style="color:var(--green-dark)">'+(c.judul||c.kategori)+'</strong> <span style="font-size:.7rem;background:#e8f5e9;color:var(--green);padding:.15rem .5rem;border-radius:10px">'+(kategoriIcon[c.kategori]||'📝')+' '+c.kategori+'</span></div>'+(me.role==='admin'?'<div><button class="btn btn-outline btn-sm" onclick="editCatatan('+c.id+')" style="font-size:.7rem;padding:.2rem .5rem">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapusCatatan('+c.id+')" style="font-size:.7rem;padding:.2rem .5rem">🗑️</button></div>':'')+'</div><div style="font-size:.75rem;color:#999;margin:.3rem 0">'+c.tanggal+' • oleh '+c.guru_nama+' • Santri: '+c.santri_nama+'</div><p style="font-size:.85rem;line-height:1.5;margin:0">'+c.isi+'</p></div>').join(''):'<p style="text-align:center;color:#999;padding:2rem">Belum ada catatan</p>';
+  if($('btnTambahCatatan'))$('btnTambahCatatan').style.display=(me.role==='admin'||me.role==='ustadz')?'':'none';
+}
+function editCatatan(id){
+  api('/api/catatan').then(data=>{const c=data.find(x=>x.id===id);if(c)showModal('catatan',c)});
+}
+async function hapusCatatan(id){
+  if(!confirm('Yakin hapus catatan ini?'))return;
+  const res=await api('/api/catatan/'+id,{method:'DELETE'});
+  toast(res.message||'Dihapus');loadCatatan();
+}
+
+async function loadWaliCatatan(){
+  // Populate anak filter from dashboard data
+  const d=await api('/api/dashboard');
+  if(d&&d.anak&&$('waliCatatanAnak')&&$('waliCatatanAnak').options.length<=1){
+    d.anak.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=a.nama;$('waliCatatanAnak').appendChild(o)});
+  }
+  const params=new URLSearchParams();
+  const anakId=$('waliCatatanAnak')?.value;
+  const kategori=$('waliCatatanKategori')?.value;
+  if(anakId)params.set('santri_id',anakId);
+  if(kategori)params.set('kategori',kategori);
+  const data=await api('/api/catatan?'+params);
+  if(!data)return;
+  const kategoriIcon={perilaku:'⚠️',akademik:'📚',kesehatan:'🏥',lainnya:'📝'};
+  $('waliCatatanList').innerHTML=data.length?data.map(c=>'<div style="background:#fff;border-radius:12px;padding:1rem;margin-bottom:.7rem;box-shadow:0 1px 4px rgba(0,0,0,.08)"><div><strong style="color:var(--green-dark)">'+(c.judul||c.kategori)+'</strong> <span style="font-size:.7rem;background:#e8f5e9;color:var(--green);padding:.15rem .5rem;border-radius:10px">'+(kategoriIcon[c.kategori]||'📝')+' '+c.kategori+'</span></div><div style="font-size:.75rem;color:#999;margin:.3rem 0">'+c.tanggal+' • oleh '+c.guru_nama+' • '+c.santri_nama+'</div><p style="font-size:.85rem;line-height:1.5;margin:0">'+c.isi+'</p></div>').join(''):'<p style="text-align:center;color:#999;padding:2rem">Belum ada catatan untuk anak Anda</p>';
 }
 
 // ── Wali Santri ──

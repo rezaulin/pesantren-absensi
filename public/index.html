@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pesantren Absensi</title>
+<meta name="theme-color" content="#2e7d32">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--green:#2e7d32;--green-light:#4caf50;--green-dark:#1b5e20;--bg:#f5f5f5;--card:#fff;--text:#333;--red:#d32f2f;--orange:#f57c00;--blue:#1976d2}
@@ -688,6 +693,8 @@ async function loadAppSettings(){
     if(loginTitle) loginTitle.innerHTML = '<img src="'+s.logo+'" style="width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:8px">' + (s.app_name||'');
   }
 }
+// Register Service Worker for PWA
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}
 </script>
 </body>
 </html>

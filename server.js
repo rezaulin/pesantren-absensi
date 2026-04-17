@@ -61,6 +61,11 @@ app.post('/api/login', (req, res) => {
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role, nama: user.nama }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, user: { id: user.id, username: user.username, role: user.role, nama: user.nama } });
 });
+app.get('/api/me', authenticate, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+  res.json({ id: user.id, username: user.username, role: user.role, nama: user.nama });
+});
 
 // ── Dashboard ──────────────────────────────────────────
 app.get('/api/dashboard', authenticate, (req, res) => {

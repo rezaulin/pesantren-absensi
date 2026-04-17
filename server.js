@@ -8,7 +8,7 @@ const PDFDocument = require('pdfkit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'pesantren-secret-key';
-const DB_FILE = path.join(__dirname, 'data.json');
+const DB_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));

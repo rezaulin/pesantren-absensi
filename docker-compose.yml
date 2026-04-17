@@ -1,0 +1,58 @@
+# ══════════════════════════════════════════════════════════
+# Docker Compose - Multi Klien
+# Cara pakai:
+#   1. Copy docker-compose.yml ke server
+#   2. Edit di bawah (ganti nama, port, domain)
+#   3. Jalankan: docker compose up -d
+# ══════════════════════════════════════════════════════════
+
+services:
+  # ── Klien 1: Pesantren Al-Falah ────────────────────────
+  pesantren-alfa:
+    build: .
+    container_name: pesantren-alfa
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - PORT=3000
+      - JWT_SECRET=ganti-random-secret-1
+    volumes:
+      - ./data-alfa:/app/data   # Persistent data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alfa.rule=Host(`absensi.alfalah.sch.id`)"
+      - "traefik.http.routers.alfa.tls=true"
+
+  # ── Klien 2: Pesantren Al-Hikmah ──────────────────────
+  pesantren-beta:
+    build: .
+    container_name: pesantren-beta
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - PORT=3000
+      - JWT_SECRET=ganti-random-secret-2
+    volumes:
+      - ./data-beta:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.beta.rule=Host(`absensi.alhikmah.sch.id`)"
+      - "traefik.http.routers.beta.tls=true"
+
+  # ── Nginx Reverse Proxy (opsional) ────────────────────
+  # Uncomment kalau mau pakai Nginx di container
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: absensi-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - pesantren-alfa
+  #     - pesantren-beta

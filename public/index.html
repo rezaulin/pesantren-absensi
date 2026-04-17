@@ -179,7 +179,7 @@ tr:hover{background:#f9f9f9}
     <div class="page" id="page-kamar">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <h3 class="page-title" style="margin:0">Kelola Kamar</h3>
-        <button class="btn btn-primary btn-sm" onclick="showModal('kamar')">+ Tambah</button>
+        <button class="btn btn-primary btn-sm" onclick="showModal('kamar')" id="btnTambahKamar">+ Tambah</button>
       </div>
       <div class="table-wrap"><table><thead><tr><th>No</th><th>Nama</th><th>Kapasitas</th><th>Pengurus</th><th>Aksi</th></tr></thead><tbody id="kamarBody"></tbody></table></div>
     </div>
@@ -425,9 +425,10 @@ function editSantri(id){
 async function loadKamar(){
   const data=await api('/api/kamar');
   if(!data)return;
+  if($('btnTambahKamar'))$('btnTambahKamar').style.display=me.role==='admin'?'':'none';
   $('kamarBody').innerHTML=data.map((k,i)=>`<tr>
     <td>${i+1}</td><td>${k.nama}</td><td>${k.kapasitas}</td><td>${k.pengurus||'-'}</td>
-    <td><button class="btn btn-outline btn-sm" onclick="editKamar(${k.id})">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus('kamar',${k.id})">🗑️</button></td>
+    <td>${me.role==='admin'?`<button class="btn btn-outline btn-sm" onclick="editKamar(${k.id})">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus('kamar',${k.id})">🗑️</button>`:''}</td>
   </tr>`).join('');
 }
 function editKamar(id){

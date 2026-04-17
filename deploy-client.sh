@@ -18,7 +18,7 @@ if [ -z "$CLIENT_NAME" ] || [ -z "$PORT" ] || [ -z "$DOMAIN" ]; then
 fi
 
 APP_DIR="/var/www/${CLIENT_NAME}"
-REPO_URL="https://github.com/rezaulin/pesantren-absensi-release.git"
+REPO_URL="https://github.com/rezaulin/vps-deploy.git"
 JWT_SECRET=$(openssl rand -hex 32)
 
 echo "═══════════════════════════════════════════"

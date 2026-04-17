@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const PDFDocument = require('pdfkit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -200,6 +201,71 @@ app.post('/api/pengumuman', authenticate, requireAdmin, (req, res) => {
 app.delete('/api/pengumuman/:id', authenticate, requireAdmin, (req, res) => {
   db.pengumuman = db.pengumuman.filter(p => p.id != req.params.id); saveDB(db);
   res.json({ message: 'Pengumuman dihapus' });
+});
+
+// ── Export PDF ──────────────────────────────────────────
+app.get('/api/export/pdf', authenticate, (req, res) => {
+  let list = db.absensi;
+  if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
+  if (req.query.kamar_id) {
+    const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
+    list = list.filter(a => santriIds.includes(a.santri_id));
+  }
+
+  const data = list.map(a => {
+    const s = db.santri.find(x => x.id === a.santri_id);
+    const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+    return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar: k ? k.nama : '-', status: a.status, keterangan: a.keterangan };
+  }).sort((a, b) => b.tanggal.localeCompare(a.tanggal));
+
+  const statusMap = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alfa' };
+
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename=rekap-absensi.pdf');
+  doc.pipe(res);
+
+  // Header
+  doc.fontSize(18).font('Helvetica-Bold').text('REKAP ABSENSI SANTRI', { align: 'center' });
+  doc.fontSize(10).font('Helvetica').text('Pesantren', { align: 'center' });
+  doc.moveDown(0.5);
+  const filterText = [];
+  if (req.query.dari) filterText.push(`Dari: ${req.query.dari}`);
+  if (req.query.sampai) filterText.push(`Sampai: ${req.query.sampai}`);
+  if (filterText.length) doc.fontSize(9).text(filterText.join(' | '), { align: 'center' });
+  doc.moveDown(1);
+
+  // Table
+  const tableTop = doc.y;
+  const colX = [40, 120, 270, 370, 450];
+  const headers = ['Tanggal', 'Nama Santri', 'Kamar', 'Status', 'Keterangan'];
+  const colW = [80, 150, 100, 80, 120];
+
+  // Header row
+  doc.font('Helvetica-Bold').fontSize(9);
+  headers.forEach((h, i) => doc.text(h, colX[i], tableTop, { width: colW[i] }));
+  doc.moveTo(40, tableTop + 15).lineTo(555, tableTop + 15).stroke();
+
+  // Data rows
+  doc.font('Helvetica').fontSize(8);
+  let y = tableTop + 20;
+  data.forEach((row, idx) => {
+    if (y > 750) { doc.addPage(); y = 40; }
+    if (idx % 2 === 0) { doc.rect(38, y - 3, 520, 16).fill('#f5f5f5').fillColor('black'); }
+    doc.text(row.tanggal, colX[0], y, { width: colW[0] });
+    doc.text(row.nama, colX[1], y, { width: colW[1] });
+    doc.text(row.kamar, colX[2], y, { width: colW[2] });
+    doc.text(statusMap[row.status] || row.status, colX[3], y, { width: colW[3] });
+    doc.text(row.keterangan || '-', colX[4], y, { width: colW[4] });
+    y += 18;
+  });
+
+  // Footer
+  doc.moveTo(40, y + 5).lineTo(555, y + 5).stroke();
+  doc.fontSize(8).text(`Total: ${data.length} data | Dibuat: ${new Date().toLocaleString('id-ID')}`, 40, y + 10, { align: 'center' });
+
+  doc.end();
 });
 
 // ── Start ──────────────────────────────────────────────

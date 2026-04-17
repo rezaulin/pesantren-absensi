@@ -201,6 +201,7 @@ tr:hover{background:#f9f9f9}
         <input type="date" id="rekapSampai">
         <select id="rekapKamar"><option value="">Semua Kamar</option></select>
         <button class="btn btn-primary btn-sm" onclick="loadRekap()">Filter</button>
+        <button class="btn btn-outline btn-sm" onclick="exportPDF()">📥 Export PDF</button>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Santri</th><th>Kamar</th><th>Status</th><th>Keterangan</th></tr></thead><tbody id="rekapBody"></tbody></table></div>
     </div>
@@ -528,6 +529,26 @@ async function hapus(type,id){
 
 // ── Auto-login ──
 if(token)initApp();
+
+function exportPDF(){
+  const token = localStorage.getItem('token');
+  const dari = $('rekapDari').value;
+  const sampai = $('rekapSampai').value;
+  const kamar = $('rekapKamar').value;
+  let url = '/api/export/pdf?';
+  if(dari) url += 'dari=' + dari + '&';
+  if(sampai) url += 'sampai=' + sampai + '&';
+  if(kamar) url += 'kamar_id=' + kamar + '&';
+  // Open in new tab with auth header
+  fetch(url, {headers: {'Authorization': 'Bearer ' + token}})
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'rekap-absensi.pdf';
+      a.click();
+    });
+}
 </script>
 </body>
 </html>

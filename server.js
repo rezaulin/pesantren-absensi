@@ -29,7 +29,8 @@ if (!db.users.find(u => u.username === 'admin')) {
   console.log('Default admin: admin / admin123');
 }
 // Init default kegiatan
-if (!db.kegiatan || db.kegiatan.length === 0) {
+if (!db.kegiatan) db.kegiatan = [];
+if (db.kegiatan.length === 0) {
   db.kegiatan = [
     { id: 1, nama: 'Ngaji Pagi', created_at: new Date().toISOString() },
     { id: 2, nama: "Ngaji Qur'an Siang", created_at: new Date().toISOString() },
@@ -37,8 +38,12 @@ if (!db.kegiatan || db.kegiatan.length === 0) {
     { id: 4, nama: 'Madrasah Diniyyah', created_at: new Date().toISOString() },
     { id: 5, nama: 'Ngaji Malam', created_at: new Date().toISOString() },
   ];
-  saveDB(db);
 }
+// Ensure "Sekolah Formal" exists (auto-add if missing)
+if (!db.kegiatan.find(k => k.nama.toLowerCase().includes('sekolah'))) {
+  db.kegiatan.push({ id: nextId(db.kegiatan), nama: 'Sekolah Formal', created_at: new Date().toISOString() });
+}
+saveDB(db);
 
 // ── Auth ───────────────────────────────────────────────
 function authenticate(req, res, next) {
@@ -136,23 +141,32 @@ app.delete('/api/kamar/:id', authenticate, requireAdmin, (req, res) => {
 app.get('/api/santri', authenticate, (req, res) => {
   let list = db.santri;
   if (req.query.kamar_id) list = list.filter(s => s.kamar_id == req.query.kamar_id);
+  if (req.query.kelas_diniyyah) list = list.filter(s => s.kelas_diniyyah === req.query.kelas_diniyyah);
+  if (req.query.kelompok_ngaji) list = list.filter(s => s.kelompok_ngaji === req.query.kelompok_ngaji);
+  if (req.query.kelas_sekolah) list = list.filter(s => s.kelas_sekolah === req.query.kelas_sekolah);
+  if (req.query.jenis_bakat) list = list.filter(s => s.jenis_bakat === req.query.jenis_bakat);
   res.json(list.map(s => {
     const k = db.kamar.find(x => x.id === s.kamar_id);
     return { ...s, kamar_nama: k ? k.nama : '-' };
   }));
 });
 app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
-  const { nama, kamar_id, status } = req.body;
+  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah } = req.body;
   if (!nama || !kamar_id) return res.status(400).json({ message: 'Nama & kamar wajib' });
-  const s = { id: nextId(db.santri), nama, kamar_id: parseInt(kamar_id), status: status || 'aktif', created_at: new Date().toISOString() };
+  const s = {
+    id: nextId(db.santri), nama, kamar_id: parseInt(kamar_id), status: status || 'aktif',
+    kelas_diniyyah: kelas_diniyyah || '', kelompok_ngaji: kelompok_ngaji || '',
+    jenis_bakat: jenis_bakat || '', kelas_sekolah: kelas_sekolah || '',
+    created_at: new Date().toISOString()
+  };
   db.santri.push(s); saveDB(db); res.json(s);
 });
 app.put('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
   const s = db.santri.find(x => x.id == req.params.id);
   if (!s) return res.status(404).json({ message: 'Santri tidak ditemukan' });
-  if (req.body.nama) s.nama = req.body.nama;
+  const fields = ['nama', 'status', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  fields.forEach(f => { if (req.body[f] !== undefined) s[f] = req.body[f]; });
   if (req.body.kamar_id) s.kamar_id = parseInt(req.body.kamar_id);
-  if (req.body.status) s.status = req.body.status;
   saveDB(db); res.json({ message: 'Santri diupdate' });
 });
 app.delete('/api/santri/:id', authenticate, requireAdmin, (req, res) => {

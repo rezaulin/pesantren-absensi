@@ -228,6 +228,7 @@ tr:hover{background:#f9f9f9}
       <h3 class="section-title">Absen Malam</h3>
       <div class="filter-bar">
         <input type="date" id="malamTanggal">
+        <select id="malamKamar" onchange="loadAbsenMalam()"><option value="">Semua Kamar</option></select>
       </div>
       <div class="absensi-grid" id="malamGrid"></div>
       <button class="btn btn-primary" style="margin-top:.8rem" onclick="simpanAbsenMalam()">Simpan Absen Malam</button>
@@ -692,17 +693,23 @@ async function loadAbsenMalam(){
   const today=new Date().toISOString().slice(0,10);
   if(!$('malamTanggal').value)$('malamTanggal').value=today;
   const tanggal=$('malamTanggal').value;
-  const santri=await api('/api/santri');
+  const kamarId=$('malamKamar').value;
+  // Populate kamar dropdown
+  const kamarList=await api('/api/kamar');
+  if(kamarList&&$('malamKamar').options.length<=1){
+    kamarList.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('malamKamar').appendChild(o)});
+  }
+  // Fetch santri (filter by kamar if selected)
+  const santri=await api('/api/santri'+(kamarId?'?kamar_id='+kamarId:''));
   if(!santri)return;
   // Find or create "Absen Malam" kegiatan
   const kegiatanList=await api('/api/kegiatan');
   let malamKegiatan=kegiatanList?kegiatanList.find(k=>k.nama.toLowerCase().includes('malam')):null;
   if(!malamKegiatan){
-    // Just use first kegiatan or show message
     if(!kegiatanList||!kegiatanList.length){$('malamGrid').innerHTML='<p style="text-align:center;color:#999;padding:1rem">Buat kegiatan "Absen Malam" dulu</p>';return}
     malamKegiatan=kegiatanList[0];
   }
-  const existing=await api('/api/absensi?tanggal='+tanggal+'&kegiatan_id='+malamKegiatan.id);
+  const existing=await api('/api/absensi?tanggal='+tanggal+'&kegiatan_id='+malamKegiatan.id+(kamarId?'&kamar_id='+kamarId:''));
   const existingMap={};
   if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
   malamData={};
@@ -711,7 +718,7 @@ async function loadAbsenMalam(){
     const st=ex?ex.status:'H';
     malamData[s.id]=st;
     return '<div class="santri-row"><div><div class="nama">'+(i+1)+'. '+s.nama+'</div><div class="kamar">'+(s.kamar_nama||'-')+'</div></div><div class="status-btns"><div class="status-btn '+(st==='H'?'active-H':'')+'" onclick="setMalamStatus('+s.id+',\'H\',this)">H</div><div class="status-btn '+(st==='A'?'active-A':'')+'" onclick="setMalamStatus('+s.id+',\'A\',this)">A</div></div></div>';
-  }).join('');
+  }).join('')||'<p style="text-align:center;color:#999;padding:1rem">Tidak ada santri di kamar ini</p>';
 }
 function setMalamStatus(id,status,el){
   malamData[id]=status;

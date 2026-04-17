@@ -267,6 +267,145 @@ app.delete('/api/pengumuman/:id', authenticate, requireAdmin, (req, res) => {
   res.json({ message: 'Pengumuman dihapus' });
 });
 
+// ── Pelanggaran ──────────────────────────────────────────
+app.get('/api/pelanggaran', authenticate, (req, res) => {
+  let list = db.pelanggaran || [];
+  if (req.query.santri_id) list = list.filter(p => p.santri_id == req.query.santri_id);
+  if (req.query.dari) list = list.filter(p => p.tanggal >= req.query.dari);
+  if (req.query.sampai) list = list.filter(p => p.tanggal <= req.query.sampai);
+  res.json(list.map(p => {
+    const s = db.santri.find(x => x.id === p.santri_id);
+    return { ...p, santri_nama: s ? s.nama : '-' };
+  }).sort((a, b) => b.tanggal.localeCompare(a.tanggal)));
+});
+app.post('/api/pelanggaran', authenticate, requireAdmin, (req, res) => {
+  const { santri_id, tanggal, jenis, keterangan, sanksi } = req.body;
+  if (!santri_id || !tanggal || !jenis) return res.status(400).json({ message: 'Santri, tanggal & jenis wajib' });
+  if (!db.pelanggaran) db.pelanggaran = [];
+  const p = { id: nextId(db.pelanggaran), santri_id: parseInt(santri_id), tanggal, jenis, keterangan: keterangan || '', sanksi: sanksi || '', created_at: new Date().toISOString() };
+  db.pelanggaran.push(p); saveDB(db); res.json(p);
+});
+app.put('/api/pelanggaran/:id', authenticate, requireAdmin, (req, res) => {
+  if (!db.pelanggaran) return res.status(404).json({ message: 'Tidak ditemukan' });
+  const p = db.pelanggaran.find(x => x.id == req.params.id);
+  if (!p) return res.status(404).json({ message: 'Tidak ditemukan' });
+  ['tanggal', 'jenis', 'keterangan', 'sanksi'].forEach(f => { if (req.body[f] !== undefined) p[f] = req.body[f]; });
+  if (req.body.santri_id) p.santri_id = parseInt(req.body.santri_id);
+  saveDB(db); res.json({ message: 'Pelanggaran diupdate' });
+});
+app.delete('/api/pelanggaran/:id', authenticate, requireAdmin, (req, res) => {
+  if (!db.pelanggaran) return res.status(404).json({ message: 'Tidak ditemukan' });
+  db.pelanggaran = db.pelanggaran.filter(p => p.id != req.params.id); saveDB(db);
+  res.json({ message: 'Pelanggaran dihapus' });
+});
+
+// ── Raport Santri ───────────────────────────────────────
+app.get('/api/raport/:santri_id', authenticate, (req, res) => {
+  const santri = db.santri.find(s => s.id == req.params.santri_id);
+  if (!santri) return res.status(404).json({ message: 'Santri tidak ditemukan' });
+  const kamar = db.kamar.find(k => k.id === santri.kamar_id);
+  let absensiList = db.absensi.filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absensiList = absensiList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absensiList = absensiList.filter(a => a.tanggal <= req.query.sampai);
+  let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
+  if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
+  if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
+  // Group absensi by kegiatan
+  const rekap = {};
+  absensiList.forEach(a => {
+    const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
+    const nama = kg ? kg.nama : 'Lainnya';
+    if (!rekap[nama]) rekap[nama] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+    rekap[nama][a.status] = (rekap[nama][a.status] || 0) + 1;
+    rekap[nama].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
+  });
+  res.json({
+    santri: { ...santri, kamar_nama: kamar ? kamar.nama : '-' },
+    periode: { dari: req.query.dari || '-', sampai: req.query.sampai || '-' },
+    rekap,
+    pelanggaran: pelanggaranList.sort((a, b) => b.tanggal.localeCompare(a.tanggal))
+  });
+});
+
+// ── Export Raport PDF ───────────────────────────────────
+app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
+  const santri = db.santri.find(s => s.id == req.params.santri_id);
+  if (!santri) return res.status(404).json({ message: 'Santri tidak ditemukan' });
+  const kamar = db.kamar.find(k => k.id === santri.kamar_id);
+  let absensiList = db.absensi.filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absensiList = absensiList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absensiList = absensiList.filter(a => a.tanggal <= req.query.sampai);
+  let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
+  if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
+  if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
+  // Group by kegiatan
+  const rekap = {};
+  absensiList.forEach(a => {
+    const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
+    const nama = kg ? kg.nama : 'Lainnya';
+    if (!rekap[nama]) rekap[nama] = { H: 0, I: 0, S: 0, A: 0 };
+    rekap[nama][a.status]++;
+  });
+  const statusMap = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alfa' };
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename=raport-' + santri.nama.replace(/\s+/g, '-') + '.pdf');
+  doc.pipe(res);
+  // Header
+  const data_settings = loadDB();
+  const appName = (data_settings.settings && data_settings.settings.app_name) || 'Pesantren';
+  doc.fontSize(18).font('Helvetica-Bold').text('RAPORT SANTRI', { align: 'center' });
+  doc.fontSize(11).font('Helvetica').text(appName, { align: 'center' });
+  doc.moveDown(1);
+  // Info santri
+  doc.fontSize(10).font('Helvetica-Bold').text('Nama: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.nama);
+  doc.font('Helvetica-Bold').text('Kamar: ', 40, doc.y, { continued: true }).font('Helvetica').text(kamar ? kamar.nama : '-');
+  doc.font('Helvetica-Bold').text('Kelas Diniyyah: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.kelas_diniyyah || '-');
+  doc.font('Helvetica-Bold').text('Kelompok Ngaji: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.kelompok_ngaji || '-');
+  doc.font('Helvetica-Bold').text('Kelas Sekolah: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.kelas_sekolah || '-');
+  doc.font('Helvetica-Bold').text('Periode: ', 40, doc.y, { continued: true }).font('Helvetica').text((req.query.dari || '-') + ' s/d ' + (req.query.sampai || '-'));
+  doc.moveDown(1);
+  // Tabel rekap kegiatan
+  doc.fontSize(12).font('Helvetica-Bold').text('Rekap Kehadiran', 40);
+  doc.moveDown(0.5);
+  const colW = [130, 60, 60, 60, 60];
+  const headers = ['Kegiatan', 'Hadir', 'Izin', 'Sakit', 'Alfa'];
+  let y = doc.y;
+  doc.fontSize(9).font('Helvetica-Bold');
+  let x = 40;
+  headers.forEach((h, i) => { doc.text(h, x, y, { width: colW[i] }); x += colW[i]; });
+  doc.moveTo(40, y + 14).lineTo(410, y + 14).stroke();
+  y += 18;
+  doc.font('Helvetica').fontSize(9);
+  Object.entries(rekap).forEach(([keg, r]) => {
+    x = 40;
+    [keg, r.H, r.I, r.S, r.A].forEach((cell, i) => { doc.text(String(cell), x, y, { width: colW[i] }); x += colW[i]; });
+    y += 16;
+  });
+  // Total
+  const totalH = Object.values(rekap).reduce((s, r) => s + r.H, 0);
+  const totalI = Object.values(rekap).reduce((s, r) => s + r.I, 0);
+  const totalS = Object.values(rekap).reduce((s, r) => s + r.S, 0);
+  const totalA = Object.values(rekap).reduce((s, r) => s + r.A, 0);
+  doc.font('Helvetica-Bold');
+  x = 40;
+  ['TOTAL', totalH, totalI, totalS, totalA].forEach((cell, i) => { doc.text(String(cell), x, y, { width: colW[i] }); x += colW[i]; });
+  doc.moveDown(2);
+  // Pelanggaran
+  if (pelanggaranList.length) {
+    doc.fontSize(12).font('Helvetica-Bold').text('Pelanggaran', 40);
+    doc.moveDown(0.5);
+    doc.fontSize(8).font('Helvetica');
+    pelanggaranList.forEach((p, i) => {
+      doc.text((i + 1) + '. [' + p.tanggal + '] ' + p.jenis + ' — ' + p.keterangan + (p.sanksi ? ' (Sanksi: ' + p.sanksi + ')' : ''), 40, doc.y, { width: 500 });
+      doc.moveDown(0.3);
+    });
+  } else {
+    doc.fontSize(10).font('Helvetica').text('Tidak ada pelanggaran.', 40);
+  }
+  doc.end();
+});
+
 // ── Settings ──────────────────────────────────────────
 app.get('/api/settings', (req, res) => {
   const data = loadDB();
@@ -286,6 +425,15 @@ app.post('/api/settings/logo', authenticate, requireAdmin, (req, res) => {
   data.settings.logo = logo;
   saveDB(data);
   res.json({ message: 'Logo diupdate' });
+});
+app.post('/api/settings/background', authenticate, requireAdmin, (req, res) => {
+  const { background } = req.body;
+  if (!background) return res.status(400).json({ message: 'Background wajib' });
+  const data = loadDB();
+  if (!data.settings) data.settings = { app_name: 'Pesantren Absensi' };
+  data.settings.background = background;
+  saveDB(data);
+  res.json({ message: 'Background diupdate' });
 });
 
 // ── Export PDF ──────────────────────────────────────────

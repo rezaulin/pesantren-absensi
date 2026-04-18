@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,9 @@ const DB_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Multer - memory storage, max 5MB
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ── JSON Database ──────────────────────────────────────
 function loadDB() {
@@ -590,6 +594,32 @@ app.post('/api/settings/delete', authenticate, requireAdmin, (req, res) => {
   if (data.settings) delete data.settings[field];
   saveDB(data);
   res.json({ message: field + ' dihapus' });
+});
+
+// File upload endpoints (multer)
+app.post('/api/settings/logo-file', authenticate, requireAdmin, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'File tidak ada' });
+  const data = loadDB();
+  if (!data.settings) data.settings = { app_name: 'Pesantren Absensi' };
+  data.settings.logo = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
+  saveDB(data);
+  res.json({ message: 'Logo diupload' });
+});
+app.post('/api/settings/bg-file', authenticate, requireAdmin, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'File tidak ada' });
+  const data = loadDB();
+  if (!data.settings) data.settings = { app_name: 'Pesantren Absensi' };
+  data.settings.background = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
+  saveDB(data);
+  res.json({ message: 'Background login diupload' });
+});
+app.post('/api/settings/dash-bg-file', authenticate, requireAdmin, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'File tidak ada' });
+  const data = loadDB();
+  if (!data.settings) data.settings = { app_name: 'Pesantren Absensi' };
+  data.settings.dashboard_bg = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
+  saveDB(data);
+  res.json({ message: 'Background menu diupload' });
 });
 
 // ── Export PDF ──────────────────────────────────────────

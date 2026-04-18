@@ -1669,20 +1669,23 @@ async function loadPengaturan(){
 function previewLogo(input){
   const file=input.files[0];if(!file)return;
   if(file.size>5*1024*1024){toast('Maks 5MB');return}
+  window._logoFile=file;
   const reader=new FileReader();
-  reader.onload=e=>{$('logoPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">'};
+  reader.onload=e=>{$('logoPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">';$('logoPlaceholder').style.display='none'};
   reader.readAsDataURL(file);
 }
 function previewBg(input){
   const file=input.files[0];if(!file)return;
   if(file.size>5*1024*1024){toast('Maks 5MB');return}
+  window._bgFile=file;
   const reader=new FileReader();
-  reader.onload=e=>{$('bgPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">'};
+  reader.onload=e=>{$('bgPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">';$('bgPlaceholder').style.display='none'};
   reader.readAsDataURL(file);
 }
 function previewDashboardBg(input){
   const file=input.files[0];if(!file)return;
   if(file.size>5*1024*1024){toast('Maks 5MB');return}
+  window._dashBgFile=file;
   const reader=new FileReader();
   reader.onload=e=>{$('dashboardBgPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">';$('dashboardBgPlaceholder').style.display='none'};
   reader.readAsDataURL(file);
@@ -1722,12 +1725,26 @@ async function saveSettings(){
   if(btn){btn.disabled=true;btn.textContent='Menyimpan...'}
   try{
     await api('/api/settings',{method:'PUT',body:JSON.stringify({app_name:appName})});
-    const logoImg=$('logoPreview').querySelector('img');
-    if(logoImg&&logoImg.src.startsWith('data:')){toast('Upload logo...');await api('/api/settings/logo',{method:'POST',body:JSON.stringify({logo:logoImg.src})})}
-    const bgImg=$('bgPreview')?.querySelector('img');
-    if(bgImg&&bgImg.src.startsWith('data:')){toast('Upload background login...');await api('/api/settings/background',{method:'POST',body:JSON.stringify({background:bgImg.src})})}
-    const dashBgImg=$('dashboardBgPreview')?.querySelector('img');
-    if(dashBgImg&&dashBgImg.src.startsWith('data:')){toast('Upload background dashboard...');await api('/api/settings/dashboard-bg',{method:'POST',body:JSON.stringify({dashboard_bg:dashBgImg.src})})}
+    if(window._logoFile){
+      toast('Upload logo...');
+      const fd=new FormData();fd.append('file',window._logoFile);
+      const r=await fetch('/api/settings/logo-file',{method:'POST',headers:{'Authorization':'Bearer '+(token||'')},body:fd});
+      const res=await r.json();if(!r.ok)throw new Error(res.message||'Gagal upload logo');
+    }
+    if(window._bgFile){
+      toast('Upload background login...');
+      const fd=new FormData();fd.append('file',window._bgFile);
+      const r=await fetch('/api/settings/bg-file',{method:'POST',headers:{'Authorization':'Bearer '+(token||'')},body:fd});
+      const res=await r.json();if(!r.ok)throw new Error(res.message||'Gagal upload background');
+    }
+    if(window._dashBgFile){
+      toast('Upload background menu...');
+      const fd=new FormData();fd.append('file',window._dashBgFile);
+      const r=await fetch('/api/settings/dash-bg-file',{method:'POST',headers:{'Authorization':'Bearer '+(token||'')},body:fd});
+      const res=await r.json();if(!r.ok)throw new Error(res.message||'Gagal upload background menu');
+    }
+    // Reset file cache
+    window._logoFile=null;window._bgFile=null;window._dashBgFile=null;
     toast('Pengaturan disimpan!');
     loadAppSettings();
   }catch(e){

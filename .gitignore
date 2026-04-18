@@ -4,3 +4,4 @@ data.json
 .build/
 temp-*
 build_faonsi.py
+.r2-config

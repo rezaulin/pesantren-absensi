@@ -4,8 +4,21 @@
 # Jalankan via crontab: 0 */6 * * * /root/pesantren-absensi/backup-r2.sh
 # ══════════════════════════════════════════════════════════
 
-BUCKET="s3://pesantren-backup"
-ENDPOINT="https://3136a4f309c99c3a3c9524f4614a7d1a.r2.cloudflarestorage.com"
+# Load R2 config
+if [ -f /root/.r2-config ]; then
+    source /root/.r2-config
+else
+    echo "Error: /root/.r2-config tidak ditemukan!"
+    echo "Buat file dengan isi:"
+    echo "  R2_ENDPOINT=https://xxx.r2.cloudflarestorage.com"
+    echo "  R2_ACCESS_KEY=xxx"
+    echo "  R2_SECRET_KEY=xxx"
+    echo "  R2_BUCKET=pesantren-backup"
+    exit 1
+fi
+
+BUCKET="s3://${R2_BUCKET}"
+ENDPOINT="$R2_ENDPOINT"
 LOCAL_DIR="/root/backups"
 LOG_FILE="/root/backup-r2.log"
 

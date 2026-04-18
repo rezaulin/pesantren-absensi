@@ -10,8 +10,16 @@
 # ══════════════════════════════════════════════════════════
 
 BACKUP_DIR="/root/backups"
-R2_BUCKET="s3://pesantren-backup/backups"
-R2_ENDPOINT="https://3136a4f309c99c3a3c9524f4614a7d1a.r2.cloudflarestorage.com"
+
+# Load R2 config
+if [ -f /root/.r2-config ]; then
+    source /root/.r2-config
+    R2_BUCKET="s3://${R2_BUCKET}/backups"
+    R2_ENDPOINT="$R2_ENDPOINT"
+else
+    R2_BUCKET="s3://pesantren-backup/backups"
+    R2_ENDPOINT="https://3136a4f309c99c3a3c9524f4614a7d1a.r2.cloudflarestorage.com"
+fi
 
 # ── Warna ──
 RED='\033[0;31m'

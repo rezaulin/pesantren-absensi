@@ -635,6 +635,14 @@ tr:hover{background:var(--bg)}
         <p id="welcomeDate"></p>
       </div>
       <div class="stats" id="statsContainer"></div>
+      <!-- Pencarian Santri -->
+      <div style="background:#fff;padding:1rem;border-radius:14px;box-shadow:var(--shadow);margin-bottom:1rem">
+        <div style="position:relative">
+          <input type="text" id="dashboardSearch" placeholder="🔍 Cari nama santri..." style="width:100%;padding:.7rem 1rem;border:1px solid #ddd;border-radius:10px;font-size:.9rem;box-sizing:border-box" oninput="searchSantriDashboard(this.value)" autocomplete="off">
+          <div id="dashboardSearchResults" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 10px 10px;max-height:250px;overflow-y:auto;display:none;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+        </div>
+      </div>
+      <div id="dashboardSantriProfile"></div>
       <div class="section-title">KESANTRIAN</div>
       <div class="grid-menu" id="gridMenu"></div>
     </div>
@@ -870,7 +878,11 @@ tr:hover{background:var(--bg)}
       <div style="background:#fff;padding:1.2rem;border-radius:14px;box-shadow:var(--shadow);margin-bottom:1rem">
         <div class="form-group">
           <label>Pilih Santri</label>
-          <select id="raportSantri" style="width:100%;padding:.6rem;border:1px solid #ddd;border-radius:8px;font-size:.9rem"></select>
+          <div style="position:relative">
+            <input type="text" id="raportSearch" placeholder="Ketik nama santri..." style="width:100%;padding:.6rem;border:1px solid #ddd;border-radius:8px;font-size:.9rem;box-sizing:border-box" oninput="searchSantriRaport(this.value)" autocomplete="off">
+            <input type="hidden" id="raportSantri">
+            <div id="raportSearchResults" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;display:none;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+          </div>
         </div>
         <div style="display:flex;gap:.5rem">
           <div class="form-group" style="flex:1"><label>Dari</label><input type="date" id="raportDari"></div>
@@ -1160,6 +1172,54 @@ async function loadDashboard(){
     badge.style.display='flex';
     badge.textContent=ann.length;
   }
+}
+
+// Dashboard - Cari Santri
+let searchTimeout=null;
+async function searchSantriDashboard(q){
+  const box=$('dashboardSearchResults');
+  if(!q||q.length<2){box.style.display='none';return;}
+  clearTimeout(searchTimeout);
+  searchTimeout=setTimeout(async()=>{
+    const all=await api('/api/santri');
+    if(!all)return;
+    const ql=q.toLowerCase();
+    const results=all.filter(s=>s.nama.toLowerCase().includes(ql)).slice(0,10);
+    if(!results.length){box.innerHTML='<div style="padding:.8rem;color:#999;text-align:center">Tidak ditemukan</div>';box.style.display='';return;}
+    box.innerHTML=results.map(s=>{
+      const k=allSantriCache.find(x=>x.id===s.id);
+      const kamar=s.kamar_nama||'-';
+      return '<div style="padding:.6rem .8rem;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'#fff\'" onclick="showSantriProfile('+s.id+');$(\'dashboardSearchResults\').style.display=\'none\'"><div><strong>'+s.nama+'</strong><br><span style="font-size:.75rem;color:#888">'+(s.kelas_diniyyah||'-')+' • '+(s.kelompok_ngaji||'-')+'</span></div><span style="font-size:.75rem;color:#888">🏠 '+kamar+'</span></div>';
+    }).join('');
+    box.style.display='';
+  },300);
+}
+async function showSantriProfile(id){
+  const raport=await api('/api/raport/'+id);
+  if(!raport)return;
+  const s=raport.santri;
+  const rekap=raport.rekap;
+  let totalH=0,totalI=0,totalS=0,totalA=0;
+  Object.values(rekap).forEach(r=>{totalH+=r.H;totalI+=r.I;totalS+=r.S;totalA+=r.A;});
+  const totalAll=totalH+totalI+totalS+totalA;
+  const persen=totalAll?Math.round(totalH/totalAll*100):0;
+  let html='<div style="background:#fff;border-radius:14px;padding:1.2rem;box-shadow:var(--shadow);margin-bottom:1rem">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.8rem">';
+  html+='<div><h3 style="margin:0;font-size:1.1rem">'+s.nama+'</h3>';
+  html+='<span style="font-size:.8rem;color:#888">'+(s.kelas_diniyyah||'-')+' • '+s.kamar_nama+'</span></div>';
+  html+='<button class="btn btn-outline btn-sm" onclick="goTo(\'raport\');setTimeout(()=>{$(\'raportSantri\').value='+id+';$(\'raportSearch\').value=\''+s.nama.replace(/'/g,"\\'")+'\';loadRaport()},100)">📄 Raport</button>';
+  html+='</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;text-align:center;margin-top:.5rem">';
+  html+='<div style="background:#dcfce7;border-radius:8px;padding:.5rem"><div style="font-size:1.2rem;font-weight:700;color:#16a34a">'+totalH+'</div><div style="font-size:.7rem;color:#666">Hadir</div></div>';
+  html+='<div style="background:#dbeafe;border-radius:8px;padding:.5rem"><div style="font-size:1.2rem;font-weight:700;color:#2563eb">'+totalI+'</div><div style="font-size:.7rem;color:#666">Izin</div></div>';
+  html+='<div style="background:#fef9c3;border-radius:8px;padding:.5rem"><div style="font-size:1.2rem;font-weight:700;color:#ca8a04">'+totalS+'</div><div style="font-size:.7rem;color:#666">Sakit</div></div>';
+  html+='<div style="background:#fee2e2;border-radius:8px;padding:.5rem"><div style="font-size:1.2rem;font-weight:700;color:#dc2626">'+totalA+'</div><div style="font-size:.7rem;color:#666">Alfa</div></div>';
+  html+='</div>';
+  html+='<div style="margin-top:.6rem;background:#f0f0f0;border-radius:6px;height:8px;overflow:hidden"><div style="background:#22c55e;height:100%;width:'+persen+'%;border-radius:6px"></div></div>';
+  html+='<div style="font-size:.75rem;color:#888;text-align:right;margin-top:.2rem">'+persen+'% kehadiran</div>';
+  html+='</div>';
+  $('dashboardSantriProfile').innerHTML=html;
+  $('dashboardSearch').value=s.nama;
 }
 
 // Absensi - Dynamic filter per kegiatan
@@ -1842,16 +1902,32 @@ async function saveCatatan(id){
 }
 
 // Raport Santri
+let raportSantriList=[];
 async function loadRaportForm(){
   const santri=await api('/api/santri');
   if(!santri)return;
-  const sel=$('raportSantri');
-  sel.innerHTML='<option value=\"\">-- Pilih Santri --</option>';
-  santri.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nama;sel.appendChild(o)});
+  raportSantriList=santri;
+  $('raportSearch').value='';
+  $('raportSantri').value='';
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
   if(!$('raportDari').value)$('raportDari').value=firstDay;
   if(!$('raportSampai').value)$('raportSampai').value=today;
+}
+let raportSearchTimeout=null;
+function searchSantriRaport(q){
+  const box=$('raportSearchResults');
+  if(!q||q.length<2){box.style.display='none';return;}
+  clearTimeout(raportSearchTimeout);
+  raportSearchTimeout=setTimeout(()=>{
+    const ql=q.toLowerCase();
+    const results=raportSantriList.filter(s=>s.nama.toLowerCase().includes(ql)).slice(0,10);
+    if(!results.length){box.innerHTML='<div style="padding:.6rem;color:#999;text-align:center">Tidak ditemukan</div>';box.style.display='';return;}
+    box.innerHTML=results.map(s=>
+      '<div style="padding:.5rem .8rem;cursor:pointer;border-bottom:1px solid #f0f0f0" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'#fff\'" onclick="$(\'raportSantri\').value='+s.id+';$(\'raportSearch\').value=\''+s.nama.replace(/'/g,"\\'")+'\';$(\'raportSearchResults\').style.display=\'none\'">'+s.nama+' <span style="font-size:.75rem;color:#888">• '+(s.kelas_diniyyah||'-')+'</span></div>'
+    ).join('');
+    box.style.display='';
+  },200);
 }
 async function loadRaport(){
   const sid=$('raportSantri').value;
@@ -2174,6 +2250,15 @@ if(token)initApp();
 
 // Service Worker
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{})}
+// Close dropdowns on click outside
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#dashboardSearch')&&!e.target.closest('#dashboardSearchResults')){
+    const d=$('dashboardSearchResults');if(d)d.style.display='none';
+  }
+  if(!e.target.closest('#raportSearch')&&!e.target.closest('#raportSearchResults')){
+    const d=$('raportSearchResults');if(d)d.style.display='none';
+  }
+});
 </script>
 </body>
 </html>

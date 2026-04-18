@@ -271,7 +271,7 @@ app.get('/api/absensi', authenticate, (req, res) => {
   if (req.query.tanggal) list = list.filter(a => a.tanggal === req.query.tanggal);
   if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
   // Filter by santri attributes
-  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'kelompok_ngaji_malam', 'jenis_bakat', 'kelas_sekolah'];
   santriFilters.forEach(f => {
     if (req.query[f]) {
       const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);
@@ -305,7 +305,7 @@ app.get('/api/rekap', authenticate, (req, res) => {
   if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
   if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
   // Filter by santri attributes
-  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'kelompok_ngaji_malam', 'jenis_bakat', 'kelas_sekolah'];
   santriFilters.forEach(f => {
     if (req.query[f]) {
       const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);
@@ -628,7 +628,7 @@ app.get('/api/export/pdf', authenticate, (req, res) => {
   if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
   if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
   if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
-  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah'];
+  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'kelompok_ngaji_malam', 'jenis_bakat', 'kelas_sekolah'];
   santriFilters.forEach(f => {
     if (req.query[f]) {
       const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);

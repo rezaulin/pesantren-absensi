@@ -655,6 +655,7 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   const appName = (dataSettings.settings && dataSettings.settings.app_name) || 'Pesantren';
   const kepalaNama = (dataSettings.settings && dataSettings.settings.kepala_nama) || '';
   const alamatLembaga = (dataSettings.settings && dataSettings.settings.alamat_lembaga) || '';
+  const namaKota = (dataSettings.settings && dataSettings.settings.nama_kota) || '';
   const logoData = (dataSettings.settings && dataSettings.settings.logo) || '';
   // Periode label
   const bulanNama = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -679,7 +680,7 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   // Tempat & tanggal cetak
   const namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const tglCetak = new Date();
-  const tglStr = 'Kendal, ' + tglCetak.getDate() + ' ' + namaBulan[tglCetak.getMonth() + 1] + ' ' + tglCetak.getFullYear();
+  const tglStr = (namaKota ? namaKota + ', ' : '') + tglCetak.getDate() + ' ' + namaBulan[tglCetak.getMonth() + 1] + ' ' + tglCetak.getFullYear();
   // ── ZONA 1: KOP SURAT (3 kolom: 15%-70%-15%) ──
   const logoW = 75; // 15% of ~515 = ~75
   const textX = L + logoW;

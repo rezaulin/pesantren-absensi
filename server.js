@@ -673,18 +673,18 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   const L = 40, R = 555, W = R - L;
   let yy = 40;
   // ── ZONA 1: KOP SURAT ──
-  // Logo (kiri)
+  // Logo (kiri) - sejajar atas dengan teks
   if (logoData && logoData.startsWith('data:')) {
     try {
       const base64 = logoData.split(',')[1];
       const buf = Buffer.from(base64, 'base64');
-      doc.image(buf, L, yy - 5, { width: 55, height: 55 });
+      doc.image(buf, L, yy, { width: 50, height: 50 });
     } catch (e) {}
   }
   // Judul (tengah)
-  doc.fontSize(16).font('Helvetica-Bold').text('LAPORAN BULANAN PERKEMBANGAN SANTRI', L, yy, { width: W, align: 'center' });
+  doc.fontSize(16).font('Helvetica-Bold').text('LAPORAN BULANAN PERKEMBANGAN SANTRI', L + 55, yy, { width: W - 55, align: 'center' });
   yy += 20;
-  doc.fontSize(11).font('Helvetica').text(appName, L, yy, { width: W, align: 'center' });
+  doc.fontSize(11).font('Helvetica').text(appName, L + 55, yy, { width: W - 55, align: 'center' });
   yy += 16;
   doc.moveTo(L, yy + 4).lineTo(R, yy + 4).lineWidth(1.5).stroke();
   doc.moveTo(L, yy + 7).lineTo(R, yy + 7).lineWidth(0.5).stroke();

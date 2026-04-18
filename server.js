@@ -654,6 +654,7 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   const dataSettings = loadDB();
   const appName = (dataSettings.settings && dataSettings.settings.app_name) || 'Pesantren';
   const kepalaNama = (dataSettings.settings && dataSettings.settings.kepala_nama) || '';
+  const logoData = (dataSettings.settings && dataSettings.settings.logo) || '';
   // Periode label
   const bulanNama = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const sampaiDate = req.query.sampai ? new Date(req.query.sampai) : new Date();
@@ -672,6 +673,15 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   const L = 40, R = 555, W = R - L;
   let yy = 40;
   // ── ZONA 1: KOP SURAT ──
+  // Logo (kiri)
+  if (logoData && logoData.startsWith('data:')) {
+    try {
+      const base64 = logoData.split(',')[1];
+      const buf = Buffer.from(base64, 'base64');
+      doc.image(buf, L, yy - 5, { width: 55, height: 55 });
+    } catch (e) {}
+  }
+  // Judul (tengah)
   doc.fontSize(16).font('Helvetica-Bold').text('LAPORAN BULANAN PERKEMBANGAN SANTRI', L, yy, { width: W, align: 'center' });
   yy += 20;
   doc.fontSize(11).font('Helvetica').text(appName, L, yy, { width: W, align: 'center' });

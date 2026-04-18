@@ -1694,11 +1694,23 @@ async function hapusSetting(field,previewId,placeholderId){
     // Reset preview
     $(previewId).innerHTML='<span style="font-size:'+(field==='logo'?'1.8':'1.2')+'rem;color:#999" id="'+placeholderId+'">'+(field==='logo'?'🕌':'🖼️')+'</span>';
     $(placeholderId).style.display='';
-    // Reload page biar background hilang
+    // Reset background langsung tanpa reload
+    if(field==='dashboard_bg'){
+      const grid=$('gridMenu');
+      if(grid){grid.style.background='';grid.style.borderRadius=''}
+      document.querySelectorAll('.menu-item').forEach(item=>{item.style.background='';item.style.backdropFilter=''});
+    }
+    if(field==='background'){
+      $('loginPage').style.background='';
+      $('loginPage').style.backgroundSize='';
+      $('loginPage').style.backgroundPosition='';
+    }
+    if(field==='logo'){
+      $('loginTitle').textContent='Pesantren Absensi';
+      const sidebarLogo=$('sidebarLogo');
+      if(sidebarLogo){sidebarLogo.style.display='none';sidebarLogo.src=''}
+    }
     toast('Foto dihapus!');
-    loadAppSettings();
-    // Reload halaman biar background benar-benar reset
-    setTimeout(()=>location.reload(),500);
   }catch(e){
     toast('Error: '+(e.message||'Gagal hapus'));
   }

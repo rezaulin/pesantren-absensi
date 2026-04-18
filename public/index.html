@@ -1994,14 +1994,14 @@ async function loadRaport(){
   // === RAPORT CONTAINER ===
   let html='<div id="raportCanvas" style="background:#fff;border-radius:14px;box-shadow:var(--shadow);margin-bottom:1rem;overflow:hidden">';
   // ── ZONA 1: KOP SURAT ──
-  html+='<div style="padding:1.2rem 1.5rem;border-bottom:3px double #333;display:flex;align-items:center;gap:1rem">';
-  if(logo) html+='<img src="'+logo+'" style="width:65px;height:65px;object-fit:contain;border-radius:8px">';
-  else html+='<div style="width:65px;height:65px;background:var(--bg-alt);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2rem">🕌</div>';
-  html+='<div style="flex:1;text-align:center">';
+  html+='<div style="padding:1.2rem 1.5rem;border-bottom:3px double #333;display:flex;align-items:flex-start;gap:1rem">';
+  if(logo) html+='<img src="'+logo+'" style="width:60px;height:60px;object-fit:contain;border-radius:8px;flex-shrink:0">';
+  else html+='<div style="width:60px;height:60px;background:var(--bg-alt);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0">🕌</div>';
+  html+='<div style="flex:1;text-align:center;padding-top:.3rem">';
   html+='<h2 style="margin:0;font-size:1.1rem;letter-spacing:.5px">LAPORAN BULANAN PERKEMBANGAN SANTRI</h2>';
   html+='<p style="margin:.2rem 0 0;font-size:.85rem;font-weight:600">'+appName+'</p>';
   html+='</div>';
-  html+='<div style="width:65px"></div>';
+  html+='<div style="width:60px;flex-shrink:0"></div>';
   html+='</div>';
   // ── ZONA 2: IDENTITAS & PERIODE ──
   html+='<div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem .8rem;font-size:.85rem;border-bottom:1px solid #e5e5e5">';

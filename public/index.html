@@ -1665,21 +1665,21 @@ async function loadPengaturan(){
 }
 function previewLogo(input){
   const file=input.files[0];if(!file)return;
-  if(file.size>500*1024){toast('Maks 500KB');return}
+  if(file.size>5*1024*1024){toast('Maks 5MB');return}
   const reader=new FileReader();
   reader.onload=e=>{$('logoPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">'};
   reader.readAsDataURL(file);
 }
 function previewBg(input){
   const file=input.files[0];if(!file)return;
-  if(file.size>1024*1024){toast('Maks 1MB');return}
+  if(file.size>5*1024*1024){toast('Maks 5MB');return}
   const reader=new FileReader();
   reader.onload=e=>{$('bgPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">'};
   reader.readAsDataURL(file);
 }
 function previewDashboardBg(input){
   const file=input.files[0];if(!file)return;
-  if(file.size>1024*1024){toast('Maks 1MB');return}
+  if(file.size>5*1024*1024){toast('Maks 5MB');return}
   const reader=new FileReader();
   reader.onload=e=>{$('dashboardBgPreview').innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">'};
   reader.readAsDataURL(file);

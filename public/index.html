@@ -1121,10 +1121,10 @@ async function loadDashboard(){
     return;
   }
   $('statsContainer').innerHTML=
-    '<div class="stat-card"><div class="num">'+(d.totalSantri||0)+'</div><div class="label">Total Santri</div></div>'+
-    '<div class="stat-card"><div class="num">'+(d.hadirHariIni||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
-    '<div class="stat-card orange"><div class="num">'+(d.izinHariIni||0)+'</div><div class="label">Izin/Sakit</div></div>'+
-    '<div class="stat-card red"><div class="num">'+(d.alfaHariIni||0)+'</div><div class="label">Alfa</div></div>';
+    '<div class="stat-card"><div class="num">'+(d.total_santri||0)+'</div><div class="label">Total Santri</div></div>'+
+    '<div class="stat-card"><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
+    '<div class="stat-card orange"><div class="num">'+(d.izin_sakit||0)+'</div><div class="label">Izin/Sakit</div></div>'+
+    '<div class="stat-card red"><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
   // Check notifications
   const ann=await api('/api/pengumuman');
   if(ann&&ann.length){
@@ -1450,10 +1450,10 @@ async function loadLaporan(){
   const d=await api('/api/dashboard');
   if(!d)return;
   $('laporanStats').innerHTML=
-    '<div class="stat-card"><div class="num">'+(d.totalSantri||0)+'</div><div class="label">Total Santri</div></div>'+
-    '<div class="stat-card"><div class="num">'+(d.totalKamar||0)+'</div><div class="label">Total Kamar</div></div>'+
-    '<div class="stat-card"><div class="num">'+(d.hadirHariIni||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
-    '<div class="stat-card red"><div class="num">'+(d.alfaHariIni||0)+'</div><div class="label">Alfa</div></div>';
+    '<div class="stat-card"><div class="num">'+(d.total_santri||0)+'</div><div class="label">Total Santri</div></div>'+
+    '<div class="stat-card"><div class="num">'+(d.total_kamar||0)+'</div><div class="label">Total Kamar</div></div>'+
+    '<div class="stat-card"><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
+    '<div class="stat-card red"><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
 }
 
 // Pengumuman

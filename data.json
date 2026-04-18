@@ -153,7 +153,7 @@
       "santri_id": 2,
       "kegiatan_id": 1,
       "tanggal": "2026-04-18",
-      "status": "I",
+      "status": "S",
       "keterangan": "",
       "recorded_by": 1,
       "created_at": "2026-04-17T02:17:42.696Z"
@@ -267,6 +267,26 @@
       "keterangan": "",
       "recorded_by": 1,
       "created_at": "2026-04-17T14:31:55.609Z"
+    },
+    {
+      "id": 17,
+      "santri_id": 3,
+      "kegiatan_id": 1,
+      "tanggal": "2026-04-18",
+      "status": "A",
+      "keterangan": "",
+      "recorded_by": 1,
+      "created_at": "2026-04-18T00:47:22.638Z"
+    },
+    {
+      "id": 18,
+      "santri_id": 4,
+      "kegiatan_id": 1,
+      "tanggal": "2026-04-18",
+      "status": "I",
+      "keterangan": "",
+      "recorded_by": 1,
+      "created_at": "2026-04-18T00:47:22.638Z"
     }
   ],
   "pengumuman": [],

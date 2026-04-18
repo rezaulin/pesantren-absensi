@@ -838,4 +838,62 @@ app.post('/api/maintenance/cleanup-absensi', authenticate, requireAdmin, (req, r
   res.json({ message: `Bersihkan ${removed} data absensi orphan`, removed, remaining: db.absensi.length });
 });
 
+// ── Rekap Ustadz ───────────────────────────────────────
+app.get('/api/rekap-ustadz', authenticate, (req, res) => {
+  const users = db.users.filter(u => u.role !== 'wali');
+  let absensiList = db.absensi || [];
+  let malamList = db.absen_malam || [];
+  let sekolahList = db.absen_sekolah || [];
+  if (req.query.dari) {
+    absensiList = absensiList.filter(a => a.tanggal >= req.query.dari);
+    malamList = malamList.filter(a => a.tanggal >= req.query.dari);
+    sekolahList = sekolahList.filter(a => a.tanggal >= req.query.dari);
+  }
+  if (req.query.sampai) {
+    absensiList = absensiList.filter(a => a.tanggal <= req.query.sampai);
+    malamList = malamList.filter(a => a.tanggal <= req.query.sampai);
+    sekolahList = sekolahList.filter(a => a.tanggal <= req.query.sampai);
+  }
+  if (req.query.user_id) {
+    absensiList = absensiList.filter(a => a.recorded_by == req.query.user_id);
+    malamList = malamList.filter(a => a.recorded_by == req.query.user_id);
+    sekolahList = sekolahList.filter(a => a.recorded_by == req.query.user_id);
+  }
+  const result = users.map(u => {
+    const userAbsensi = absensiList.filter(a => a.recorded_by === u.id);
+    const userMalam = malamList.filter(a => a.recorded_by === u.id);
+    const userSekolah = sekolahList.filter(a => a.recorded_by === u.id);
+    // Per kegiatan breakdown
+    const perKegiatan = {};
+    userAbsensi.forEach(a => {
+      const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
+      const nama = kg ? kg.nama : 'Lainnya';
+      if (!perKegiatan[nama]) perKegiatan[nama] = { total: 0, H: 0, I: 0, S: 0, A: 0 };
+      perKegiatan[nama].total++;
+      perKegiatan[nama][a.status]++;
+    });
+    if (userMalam.length) {
+      perKegiatan['Absen Malam'] = { total: userMalam.length, H: 0, I: 0, S: 0, A: 0 };
+      userMalam.forEach(a => perKegiatan['Absen Malam'][a.status]++);
+    }
+    if (userSekolah.length) {
+      perKegiatan['Absen Sekolah'] = { total: userSekolah.length, H: 0, I: 0, S: 0, A: 0 };
+      userSekolah.forEach(a => perKegiatan['Absen Sekolah'][a.status]++);
+    }
+    // Per tanggal
+    const perTanggal = {};
+    [...userAbsensi, ...userMalam, ...userSekolah].forEach(a => {
+      if (!perTanggal[a.tanggal]) perTanggal[a.tanggal] = 0;
+      perTanggal[a.tanggal]++;
+    });
+    const total = userAbsensi.length + userMalam.length + userSekolah.length;
+    const aktifDays = Object.keys(perTanggal).length;
+    return {
+      user_id: u.id, nama: u.nama, username: u.username, role: u.role,
+      total, aktif_days: aktifDays, per_kegiatan: perKegiatan, per_tanggal: perTanggal
+    };
+  }).filter(r => r.total > 0 || !req.query.user_id);
+  res.json(result.sort((a, b) => b.total - a.total));
+});
+
 app.listen(PORT, () => console.log(`Server jalan di http://localhost:${PORT}`));

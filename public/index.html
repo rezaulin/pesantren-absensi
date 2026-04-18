@@ -1134,7 +1134,11 @@ function loadPageData(page){
   if(page==='pengumuman')loadPengumuman();
   if(page==='pengaturan')loadPengaturan();
   if(page==='pelanggaran')loadPelanggaran();
-  if(page==='raport')loadRaportForm();
+  if(page==='raport'){
+    const a=window._raportAutoLoad;
+    window._raportAutoLoad=null;
+    loadRaportForm(a?a.id:null,a?a.nama:null);
+  }
   if(page==='sensus')loadSensus();
   if(page==='laporan')loadLaporan();
   if(page==='rekap-ustadz')loadRekapUstadz();
@@ -1207,7 +1211,7 @@ async function showSantriProfile(id){
   html+='<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.8rem">';
   html+='<div><h3 style="margin:0;font-size:1.1rem">'+s.nama+'</h3>';
   html+='<span style="font-size:.8rem;color:#888">'+(s.kelas_diniyyah||'-')+' • '+s.kamar_nama+'</span></div>';
-  html+='<button class="btn btn-outline btn-sm" onclick="goTo(\'raport\');setTimeout(()=>{$(\'raportSantri\').value='+id+';$(\'raportSearch\').value=\''+s.nama.replace(/'/g,"\\'")+'\';loadRaport()},100)">📄 Raport</button>';
+  html+='<button class="btn btn-outline btn-sm" onclick="openRaportFor('+id+',\''+s.nama.replace(/'/g,"\\'")+'\')">📄 Raport</button>';
   html+='</div>';
   html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;text-align:center;margin-top:.5rem">';
   html+='<div style="background:#dcfce7;border-radius:8px;padding:.5rem"><div style="font-size:1.2rem;font-weight:700;color:#16a34a">'+totalH+'</div><div style="font-size:.7rem;color:#666">Hadir</div></div>';
@@ -1903,16 +1907,28 @@ async function saveCatatan(id){
 
 // Raport Santri
 let raportSantriList=[];
-async function loadRaportForm(){
+async function loadRaportForm(autoLoadId,autoLoadNama){
   const santri=await api('/api/santri');
   if(!santri)return;
   raportSantriList=santri;
-  $('raportSearch').value='';
-  $('raportSantri').value='';
   const today=new Date().toISOString().slice(0,10);
   const firstDay=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().slice(0,10);
   if(!$('raportDari').value)$('raportDari').value=firstDay;
   if(!$('raportSampai').value)$('raportSampai').value=today;
+  // If auto-loading from dashboard
+  if(autoLoadId){
+    $('raportSantri').value=autoLoadId;
+    $('raportSearch').value=autoLoadNama||'';
+    loadRaport();
+  }else{
+    $('raportSearch').value='';
+    $('raportSantri').value='';
+  }
+}
+function openRaportFor(id,nama){
+  navigateSidebar('raport');
+  // loadRaportForm is called by loadPageData, so we set a flag to auto-load after
+  window._raportAutoLoad={id,nama};
 }
 let raportSearchTimeout=null;
 function searchSantriRaport(q){

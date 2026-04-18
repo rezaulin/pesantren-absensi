@@ -28,8 +28,8 @@ log() {
 
 mkdir -p "$LOCAL_DIR"
 
-# 1. Backup lokal dulu (semua klien)
-for dir in /var/www/absensi-* /var/www/pesantren-*; do
+# 1. Backup lokal dulu (semua klien di /var/www/)
+for dir in /var/www/*/; do
     if [ -f "$dir/data.json" ]; then
         NAME=$(basename "$dir")
         TIMESTAMP=$(date '+%Y%m%d_%H%M')

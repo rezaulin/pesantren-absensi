@@ -53,9 +53,9 @@ if [ "$1" = "list" ] || [ -z "$1" ]; then
     echo "═══════════════════════════════════════════"
     echo ""
 
-    # Scan folder klien di /var/www/
+    # Scan semua folder klien di /var/www/
     FOUND=0
-    for dir in /var/www/absensi-* /var/www/pesantren-*; do
+    for dir in /var/www/*/; do
         if [ -d "$dir" ]; then
             NAME=$(basename "$dir")
             # Cari backup terbaru

@@ -15,7 +15,7 @@ log() {
 mkdir -p "$BACKUP_DIR"
 
 # Scan semua folder klien di /var/www/
-for dir in /var/www/pesantren-*; do
+for dir in /var/www/*/; do
     if [ -f "$dir/data.json" ]; then
         NAME=$(basename "$dir")
         TIMESTAMP=$(date '+%Y%m%d_%H%M')

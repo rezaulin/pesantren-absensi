@@ -3,17 +3,39 @@
 # Restore Script - Restore data.json klien
 # Cara pakai:
 #   bash restore.sh list                          → Lihat semua klien & backup
-#   bash restore.sh <nama-klien>                  → Restore backup terbaru
-#   bash restore.sh <nama-klien> <timestamp>      → Restore backup tertentu
+#   bash restore.sh <nama-klien>                  → Restore backup terbaru (lokal)
+#   bash restore.sh <nama-klien> <timestamp>      → Restore backup tertentu (lokal)
+#   bash restore.sh <nama-klien> --r2             → Restore dari R2 (terbaru)
+#   bash restore.sh list --r2                     → Lihat backup di R2
 # ══════════════════════════════════════════════════════════
 
 BACKUP_DIR="/root/backups"
+R2_BUCKET="s3://pesantren-backup/backups"
+R2_ENDPOINT="https://3136a4f309c99c3a3c9524f4614a7d1a.r2.cloudflarestorage.com"
 
 # ── Warna ──
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
+
+# ── List backup dari R2 ──
+if [ "$1" = "list" ] && [ "$2" = "--r2" ]; then
+    echo ""
+    echo "═══════════════════════════════════════════"
+    echo "  Backup di Cloudflare R2"
+    echo "═══════════════════════════════════════════"
+    echo ""
+    aws --endpoint-url "$R2_ENDPOINT" s3 ls "$R2_BUCKET/" 2>/dev/null | sort | while read line; do
+        FILENAME=$(echo "$line" | awk '{print $4}')
+        SIZE=$(echo "$line" | awk '{print $3}')
+        if [ -n "$FILENAME" ]; then
+            echo "  📦 $FILENAME ($SIZE bytes)"
+        fi
+    done
+    echo ""
+    exit 0
+fi
 
 # ── List semua klien & backup ──
 if [ "$1" = "list" ] || [ -z "$1" ]; then
@@ -76,6 +98,11 @@ fi
 # ── Restore ──
 CLIENT_NAME="$1"
 TIMESTAMP="$2"
+USE_R2=false
+if [ "$TIMESTAMP" = "--r2" ]; then
+    USE_R2=true
+    TIMESTAMP=""
+fi
 
 # Tentukan folder klien
 if [ "$CLIENT_NAME" = "main" ]; then
@@ -95,7 +122,23 @@ else
 fi
 
 # Cari file backup
-if [ -n "$TIMESTAMP" ]; then
+if [ "$USE_R2" = true ]; then
+    # Download dari R2
+    echo -e "  ${YELLOW}Mengambil backup dari R2...${NC}"
+    R2_FILE=$(aws --endpoint-url "$R2_ENDPOINT" s3 ls "$R2_BUCKET/" 2>/dev/null | grep "${BACKUP_PREFIX}_" | sort | tail -1 | awk '{print $4}')
+    if [ -z "$R2_FILE" ]; then
+        echo -e "${RED}Error: Tidak ada backup di R2 untuk $CLIENT_NAME${NC}"
+        exit 1
+    fi
+    BACKUP_FILE="$BACKUP_DIR/$R2_FILE"
+    mkdir -p "$BACKUP_DIR"
+    aws --endpoint-url "$R2_ENDPOINT" s3 cp "$R2_BUCKET/$R2_FILE" "$BACKUP_FILE" --quiet 2>/dev/null
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo -e "${RED}Error: Gagal download dari R2${NC}"
+        exit 1
+    fi
+    echo -e "  ${GREEN}✓${NC} Downloaded: $R2_FILE"
+elif [ -n "$TIMESTAMP" ]; then
     BACKUP_FILE="$BACKUP_DIR/${BACKUP_PREFIX}_${TIMESTAMP}.json"
     if [ ! -f "$BACKUP_FILE" ]; then
         echo -e "${RED}Error: Backup tidak ditemukan: $BACKUP_FILE${NC}"
@@ -104,12 +147,15 @@ if [ -n "$TIMESTAMP" ]; then
         ls -1t "$BACKUP_DIR/${BACKUP_PREFIX}_"*.json 2>/dev/null | head -10 | while read f; do
             echo "  $(basename "$f" | sed "s/${BACKUP_PREFIX}_//;s/\.json//")"
         done
+        echo ""
+        echo "Atau coba dari R2: bash restore.sh $CLIENT_NAME --r2"
         exit 1
     fi
 else
     BACKUP_FILE=$(ls -t "$BACKUP_DIR/${BACKUP_PREFIX}_"*.json 2>/dev/null | head -1)
     if [ -z "$BACKUP_FILE" ]; then
-        echo -e "${RED}Error: Tidak ada backup untuk $CLIENT_NAME${NC}"
+        echo -e "${RED}Error: Tidak ada backup lokal untuk $CLIENT_NAME${NC}"
+        echo -e "  Coba dari R2: ${YELLOW}bash restore.sh $CLIENT_NAME --r2${NC}"
         exit 1
     fi
 fi

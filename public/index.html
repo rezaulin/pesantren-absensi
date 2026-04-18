@@ -268,7 +268,7 @@ a{color:inherit;text-decoration:none}
   gap:.7rem;padding:0 .1rem;
 }
 .menu-item{
-  background:var(--secondary-light);
+  background:#fff;
   border-radius:var(--radius-lg);
   padding:.9rem .4rem .7rem;
   text-align:center;
@@ -1697,8 +1697,8 @@ async function hapusSetting(field,previewId,placeholderId){
     // Reset background langsung tanpa reload
     if(field==='dashboard_bg'){
       const grid=$('gridMenu');
-      if(grid){grid.style.background='';grid.style.borderRadius=''}
-      document.querySelectorAll('.menu-item').forEach(item=>{item.style.background='';item.style.backdropFilter=''});
+      if(grid){grid.style.background='';grid.style.borderRadius='';grid.style.padding=''}
+      document.querySelectorAll('.menu-item').forEach(item=>{item.style.background='#fff';item.style.backdropFilter=''});
     }
     if(field==='background'){
       $('loginPage').style.background='';

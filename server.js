@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'pesantren-secret-key';
 const DB_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── JSON Database ──────────────────────────────────────

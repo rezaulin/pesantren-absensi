@@ -214,11 +214,10 @@ a{color:inherit;text-decoration:none}
 .sidebar{
   position:fixed;left:-280px;top:0;width:280px;height:100%;
   background:#fff;box-shadow:var(--shadow-lg);
-  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  transition:left .3s cubic-bezier(.4,0,.2,1);
   z-index:200;overflow-y:auto;
-  transform:translateX(0);
 }
-.sidebar.open{left:0;transform:translateX(280px)}
+.sidebar.open{left:0}
 .sidebar-header{
   background:linear-gradient(135deg,var(--secondary),var(--secondary-light));
   color:#fff;padding:1.3rem;

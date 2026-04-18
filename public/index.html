@@ -1991,55 +1991,115 @@ async function loadRaport(){
   let totalH=0,totalI=0,totalS=0,totalA=0;
   Object.values(d.rekap).forEach(r=>{totalH+=r.H;totalI+=r.I;totalS+=r.S;totalA+=r.A;});
   const totalAll=totalH+totalI+totalS+totalA;
+  // Tempat & tanggal cetak
+  const tglCetak=new Date();
+  const namaBulan=['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const tglStr='Kendal, '+tglCetak.getDate()+' '+namaBulan[tglCetak.getMonth()+1]+' '+tglCetak.getFullYear();
+  // Wali display: if empty or "-", show dotted line
+  const waliDisplay=(!waliNama||waliNama==='-')?'......................................':waliNama;
   // === RAPORT CONTAINER ===
   let html='<div id="raportCanvas" style="background:#fff;border-radius:14px;box-shadow:var(--shadow);margin-bottom:1rem;overflow:hidden">';
-  // ── ZONA 1: KOP SURAT ──
-  html+='<div style="padding:1.2rem 1.5rem;border-bottom:3px double #333;display:flex;align-items:flex-start;gap:1rem">';
-  if(logo) html+='<img src="'+logo+'" style="width:60px;height:60px;object-fit:contain;border-radius:8px;flex-shrink:0">';
-  else html+='<div style="width:60px;height:60px;background:var(--bg-alt);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0">🕌</div>';
-  html+='<div style="flex:1;text-align:center;padding-top:.3rem">';
-  html+='<h2 style="margin:0;font-size:1.1rem;letter-spacing:.5px">LAPORAN BULANAN PERKEMBANGAN SANTRI</h2>';
-  html+='<p style="margin:.2rem 0 0;font-size:.85rem;font-weight:600">'+appName+'</p>';
+  // ── ZONA 1: KOP SURAT (3 kolom bayangan: 15%-70%-15%) ──
+  html+='<div style="padding:1.2rem 1.5rem 1rem;border-bottom:3px double #333">';
+  html+='<table style="width:100%;border:none;border-collapse:collapse"><tr>';
+  // Kolom kiri 15%: Logo
+  html+='<td style="width:15%;text-align:center;vertical-align:middle;border:none">';
+  if(logo) html+='<img src="'+logo+'" style="width:55px;height:55px;object-fit:contain">';
+  else html+='<div style="width:55px;height:55px;background:var(--bg-alt);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:1.8rem">🕌</div>';
+  html+='</td>';
+  // Kolom tengah 70%: Teks kop
+  html+='<td style="width:70%;text-align:center;vertical-align:middle;border:none">';
+  html+='<div style="font-size:1.15rem;font-weight:800;letter-spacing:.3px;margin-bottom:.15rem">'+appName+'</div>';
+  html+='<div style="font-size:.95rem;font-weight:700;margin-bottom:.1rem">LAPORAN BULANAN PERKEMBANGAN SANTRI</div>';
+  html+='<div style="font-size:.72rem;color:#666">Jl. Raya Kendal - Semarang, Kendal, Jawa Tengah</div>';
+  html+='</td>';
+  // Kolom kanan 15%: Kosong (penyeimbang)
+  html+='<td style="width:15%;border:none"></td>';
+  html+='</tr></table>';
   html+='</div>';
-  html+='<div style="width:60px;flex-shrink:0"></div>';
-  html+='</div>';
-  // ── ZONA 2: IDENTITAS & PERIODE ──
-  html+='<div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem .8rem;font-size:.85rem;border-bottom:1px solid #e5e5e5">';
-  html+='<div><strong>Nama Santri</strong></div><div>: '+s.nama+'</div>';
-  html+='<div><strong>Asrama / Kamar</strong></div><div>: '+(s.kamar_nama||'-')+'</div>';
-  html+='<div><strong>Alamat</strong></div><div>: '+(s.alamat||'-')+'</div>';
-  html+='<div><strong>Kelas Diniyyah</strong></div><div>: '+(s.kelas_diniyyah||'-')+'</div>';
-  html+='<div><strong>Orang Tua / Wali</strong></div><div>: '+waliNama+'</div>';
-  html+='<div><strong>Periode</strong></div><div>: '+periodeLabel+'</div>';
-  html+='</div>';
+  // ── ZONA 2: IDENTITAS (6 kolom untuk titik dua sejajar) ──
+  html+='<div style="padding:.8rem 1.5rem;border-bottom:1px solid #e5e5e5">';
+  html+='<table style="width:100%;border:none;border-collapse:collapse;font-size:.85rem">';
+  // Baris 1: Nama | Kelas
+  html+='<tr>';
+  html+='<td style="width:13%;padding:.2rem 0;border:none;font-weight:600">Nama Santri</td>';
+  html+='<td style="width:2%;padding:.2rem .3rem 0 0;border:none;text-align:center">:</td>';
+  html+='<td style="width:33%;padding:.2rem 0;border:none">'+s.nama+'</td>';
+  html+='<td style="width:2%;border:none"></td>';
+  html+='<td style="width:13%;padding:.2rem 0;border:none;font-weight:600">Kelas Diniyyah</td>';
+  html+='<td style="width:2%;padding:.2rem .3rem 0 0;border:none;text-align:center">:</td>';
+  html+='<td style="width:35%;padding:.2rem 0;border:none">'+(s.kelas_diniyyah||'-')+'</td>';
+  html+='</tr>';
+  // Baris 2: Asrama | Periode
+  html+='<tr>';
+  html+='<td style="padding:.2rem 0;border:none;font-weight:600">Asrama</td>';
+  html+='<td style="padding:.2rem .3rem 0 0;border:none;text-align:center">:</td>';
+  html+='<td style="padding:.2rem 0;border:none">'+(s.kamar_nama||'-')+'</td>';
+  html+='<td style="border:none"></td>';
+  html+='<td style="padding:.2rem 0;border:none;font-weight:600">Periode</td>';
+  html+='<td style="padding:.2rem .3rem 0 0;border:none;text-align:center">:</td>';
+  html+='<td style="padding:.2rem 0;border:none">'+periodeLabel+'</td>';
+  html+='</tr>';
+  // Baris 3: Alamat | Orang Tua
+  html+='<tr>';
+  html+='<td style="padding:.2rem 0;border:none;font-weight:600">Alamat</td>';
+  html+='<td style="padding:.2rem .3rem 0 0;border:none;text-align:center">:</td>';
+  html+='<td style="padding:.2rem 0;border:none">'+(s.alamat||'-')+'</td>';
+  html+='<td style="border:none"></td>';
+  html+='<td style="padding:.2rem 0;border:none;font-weight:600">Orang Tua</td>';
+  html+='<td style="padding:.2rem .3rem 0 0;border:none;text-align:center">:</td>';
+  html+='<td style="padding:.2rem 0;border:none">'+waliDisplay+'</td>';
+  html+='</tr>';
+  html+='</table></div>';
   // ── ZONA 3: INTI LAPORAN ──
   html+='<div style="padding:1rem 1.5rem">';
   // Blok A: Rekap Absensi
-  html+='<div style="margin-bottom:1.2rem">';
-  html+='<h4 style="margin:0 0 .6rem;font-size:.9rem;border-bottom:2px solid var(--green);padding-bottom:.3rem;display:inline-block">A. Rekap Absensi</h4>';
-  html+='<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.3rem">';
-  html+='<thead><tr style="background:#f8f9fa"><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Kegiatan</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:55px">Hadir</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:50px">Izin</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:50px">Sakit</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:50px">Alpa</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:55px">Total</th></tr></thead>';
-  html+='<tbody>';
+  html+='<div style="margin-bottom:1.5rem">';
+  html+='<h4 style="margin:0 0 .6rem;font-size:.9rem;border-bottom:2px solid #16a34a;padding-bottom:.3rem;display:inline-block">A. Rekap Absensi</h4>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.4rem">';
+  html+='<thead><tr style="background:#f8f9fa">';
+  html+='<th style="padding:.6rem .5rem;text-align:left;border:1px solid #ddd">Kegiatan</th>';
+  html+='<th style="padding:.6rem;text-align:center;border:1px solid #ddd;width:55px">Hadir</th>';
+  html+='<th style="padding:.6rem;text-align:center;border:1px solid #ddd;width:50px">Izin</th>';
+  html+='<th style="padding:.6rem;text-align:center;border:1px solid #ddd;width:50px">Sakit</th>';
+  html+='<th style="padding:.6rem;text-align:center;border:1px solid #ddd;width:50px">Alpa</th>';
+  html+='<th style="padding:.6rem;text-align:center;border:1px solid #ddd;width:55px">Total</th>';
+  html+='</tr></thead><tbody>';
   if(Object.keys(d.rekap).length){
     Object.entries(d.rekap).forEach(([keg,r])=>{
       const t=r.H+r.I+r.S+r.A;
-      html+='<tr><td style="padding:.45rem .5rem;border:1px solid #ddd">'+keg+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd;color:#16a34a;font-weight:600">'+r.H+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd">'+r.I+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd">'+r.S+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd;color:#dc2626">'+r.A+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd;font-weight:600">'+t+'</td></tr>';
+      html+='<tr>';
+      html+='<td style="padding:.5rem .5rem;border:1px solid #ddd">'+keg+'</td>';
+      html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;color:#16a34a;font-weight:600">'+r.H+'</td>';
+      html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+r.I+'</td>';
+      html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+r.S+'</td>';
+      html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;color:#dc2626">'+r.A+'</td>';
+      html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;font-weight:600">'+t+'</td>';
+      html+='</tr>';
     });
   }else{
     html+='<tr><td colspan="6" style="padding:.8rem;text-align:center;color:#999;border:1px solid #ddd">Tidak ada data absensi</td></tr>';
   }
-  html+='<tr style="background:#f0fdf4;font-weight:700"><td style="padding:.5rem;border:1px solid #ddd">TOTAL</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd;color:#16a34a">'+totalH+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+totalI+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+totalS+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd;color:#dc2626">'+totalA+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+totalAll+'</td></tr>';
+  // Baris TOTAL
+  html+='<tr style="background:#f0fdf4;font-weight:700">';
+  html+='<td style="padding:.5rem .5rem;border:1px solid #ddd;border-top:2px solid #333">TOTAL</td>';
+  html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;border-top:2px solid #333;color:#16a34a">'+totalH+'</td>';
+  html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;border-top:2px solid #333">'+totalI+'</td>';
+  html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;border-top:2px solid #333">'+totalS+'</td>';
+  html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;border-top:2px solid #333;color:#dc2626">'+totalA+'</td>';
+  html+='<td style="padding:.5rem;text-align:center;border:1px solid #ddd;border-top:2px solid #333">'+totalAll+'</td>';
+  html+='</tr>';
   html+='</tbody></table></div>';
-  // Blok B: Kedisiplinan / Pelanggaran
-  html+='<div style="margin-bottom:1.2rem">';
+  // Blok B: Kedisiplinan
+  html+='<div style="margin-bottom:1.5rem">';
   html+='<h4 style="margin:0 0 .6rem;font-size:.9rem;border-bottom:2px solid #ef4444;padding-bottom:.3rem;display:inline-block">B. Catatan Kedisiplinan</h4>';
   if(d.pelanggaran.length){
-    html+='<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.3rem">';
-    html+='<thead><tr style="background:#f8f9fa"><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:30px">No</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd;width:85px">Tanggal</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Jenis</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Keterangan</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Sanksi</th></tr></thead><tbody>';
     d.pelanggaran.forEach((p,i)=>{
-      html+='<tr><td style="padding:.4rem .5rem;text-align:center;border:1px solid #ddd">'+(i+1)+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+p.tanggal+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+p.jenis+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+(p.keterangan||'-')+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+(p.sanksi||'-')+'</td></tr>';
+      html+='<div style="margin-bottom:.3rem;font-size:.83rem">';
+      html+='<span style="font-weight:600">'+(i+1)+'. ['+p.tanggal+'] '+p.jenis+'</span>';
+      html+='<div style="margin-left:1.2rem;color:#555">'+(p.keterangan||'-')+(p.sanksi?' — <em>Sanksi: '+p.sanksi+'</em>':'')+'</div>';
+      html+='</div>';
     });
-    html+='</tbody></table>';
   }else{
     html+='<p style="color:#16a34a;font-size:.85rem;padding:.5rem;background:#f0fdf4;border-radius:6px;margin:.3rem 0 0">✅ Alhamdulillah, tidak ada catatan pelanggaran bulan ini.</p>';
   }
@@ -2049,27 +2109,36 @@ async function loadRaport(){
   html+='<h4 style="margin:0 0 .6rem;font-size:.9rem;border-bottom:2px solid #3b82f6;padding-bottom:.3rem;display:inline-block">C. Laporan Perkembangan</h4>';
   if(d.catatan_guru&&d.catatan_guru.length){
     d.catatan_guru.forEach(c=>{
-      html+='<div style="background:#f8fafc;padding:.7rem .8rem;border-radius:6px;margin-bottom:.4rem;border-left:3px solid #3b82f6">';
-      html+='<div style="font-size:.75rem;color:#888;margin-bottom:.2rem">['+c.tanggal+'] '+(c.judul||c.kategori)+' — '+c.guru_nama+'</div>';
-      html+='<p style="font-size:.83rem;margin:0;line-height:1.5">'+c.isi+'</p>';
+      html+='<div style="border:1px solid #ddd;border-radius:8px;padding:.7rem .8rem;margin-bottom:.5rem;min-height:60px">';
+      html+='<div style="font-size:.75rem;color:#888;margin-bottom:.3rem">['+c.tanggal+'] '+(c.judul||c.kategori)+' — '+c.guru_nama+'</div>';
+      html+='<p style="font-size:.83rem;margin:0;line-height:1.6">'+c.isi+'</p>';
       html+='</div>';
     });
   }else{
-    html+='<div style="border:1px dashed #ddd;border-radius:6px;padding:1.5rem;min-height:80px;text-align:center;color:#bbb;font-size:.83rem">Belum ada catatan perkembangan untuk periode ini.</div>';
+    html+='<div style="border:1px dashed #ccc;border-radius:8px;padding:1.5rem;min-height:80px;text-align:center;color:#bbb;font-size:.83rem">Belum ada catatan perkembangan untuk periode ini.</div>';
   }
   html+='</div>';
   html+='</div>'; // end zona 3
-  // ── ZONA 4: KOLOM PENGESAHAN ──
+  // ── ZONA 4: PENGESAHAN (3 kolom) ──
   html+='<div style="padding:1rem 1.5rem 1.5rem;border-top:1px solid #e5e5e5;page-break-inside:avoid">';
   html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;text-align:center;font-size:.82rem">';
-  // Kiri: Orang Tua
-  html+='<div><p style="margin:0 0 3.5rem">Orang Tua / Wali</p><p style="margin:0;border-top:1px solid #333;padding-top:.3rem;font-weight:600">'+waliNama+'</p></div>';
-  // Tengah: Wali Kelas (kosong)
-  html+='<div><p style="margin:0 0 3.5rem">Wali Kelas</p><p style="margin:0;border-top:1px solid #333;padding-top:.3rem">&nbsp;</p></div>';
-  // Kanan: Kepala Yayasan
-  html+='<div><p style="margin:0 0 3.5rem">Kepala Yayasan</p><p style="margin:0;border-top:1px solid #333;padding-top:.3rem;font-weight:600">'+(kepalaNama||'-')+'</p></div>';
+  // Kiri: Orang Tua / Wali
+  html+='<div>';
+  html+='<p style="margin:0 0 3.5rem">Orang Tua / Wali</p>';
+  html+='<p style="margin:0;border-top:1px solid #333;padding-top:.3rem;font-weight:600">'+waliDisplay+'</p>';
   html+='</div>';
-  html+='<p style="text-align:right;font-size:.75rem;color:#888;margin:.8rem 0 0">Dicetak: '+new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+'</p>';
+  // Tengah: Wali Kelas (kosong)
+  html+='<div>';
+  html+='<p style="margin:0 0 3.5rem">Wali Kelas</p>';
+  html+='<p style="margin:0;border-top:1px solid #333;padding-top:.3rem">&nbsp;</p>';
+  html+='</div>';
+  // Kanan: Kepala Yayasan (tempat/tanggal, jabatan, ruang ttd, nama)
+  html+='<div>';
+  html+='<p style="margin:0 0 .3rem;font-size:.78rem">'+tglStr+'</p>';
+  html+='<p style="margin:0 0 2.8rem">Kepala Yayasan</p>';
+  html+='<p style="margin:0;border-top:1px solid #333;padding-top:.3rem;font-weight:700">'+(kepalaNama||'......................................')+'</p>';
+  html+='</div>';
+  html+='</div>';
   html+='</div>';
   html+='</div>'; // end raportCanvas
   // Print button

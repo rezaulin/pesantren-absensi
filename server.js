@@ -672,8 +672,18 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   doc.pipe(res);
   const L = 40, R = 555, W = R - L;
   let yy = 40;
-  // ── ZONA 1: KOP SURAT ──
-  // Logo (kiri) - sejajar atas dengan teks
+  // Wali display
+  const waliDisplay = (wali && wali.nama && wali.nama !== '-') ? wali.nama : '......................................';
+  const kepalaDisplay = (kepalaNama && kepalaNama !== '-') ? kepalaNama : '......................................';
+  // Tempat & tanggal cetak
+  const namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const tglCetak = new Date();
+  const tglStr = 'Kendal, ' + tglCetak.getDate() + ' ' + namaBulan[tglCetak.getMonth() + 1] + ' ' + tglCetak.getFullYear();
+  // ── ZONA 1: KOP SURAT (3 kolom: 15%-70%-15%) ──
+  const logoW = 75; // 15% of ~515 = ~75
+  const textX = L + logoW;
+  const textW = W - logoW * 2;
+  // Logo kiri
   if (logoData && logoData.startsWith('data:')) {
     try {
       const base64 = logoData.split(',')[1];
@@ -681,44 +691,63 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
       doc.image(buf, L, yy, { width: 50, height: 50 });
     } catch (e) {}
   }
-  // Judul (tengah)
-  doc.fontSize(16).font('Helvetica-Bold').text('LAPORAN BULANAN PERKEMBANGAN SANTRI', L + 55, yy, { width: W - 55, align: 'center' });
-  yy += 20;
-  doc.fontSize(11).font('Helvetica').text(appName, L + 55, yy, { width: W - 55, align: 'center' });
-  yy += 16;
+  // Teks tengah - hierarki
+  doc.fontSize(14).font('Helvetica-Bold').text(appName, textX, yy, { width: textW, align: 'center' });
+  yy += 18;
+  doc.fontSize(11).font('Helvetica-Bold').text('LAPORAN BULANAN PERKEMBANGAN SANTRI', textX, yy, { width: textW, align: 'center' });
+  yy += 14;
+  doc.fontSize(8).font('Helvetica').text('Jl. Raya Kendal - Semarang, Kendal, Jawa Tengah', textX, yy, { width: textW, align: 'center' });
+  yy += 14;
+  // Garis ganda penuh
   doc.moveTo(L, yy + 4).lineTo(R, yy + 4).lineWidth(1.5).stroke();
   doc.moveTo(L, yy + 7).lineTo(R, yy + 7).lineWidth(0.5).stroke();
   yy += 16;
-  // ── ZONA 2: IDENTITAS ──
-  doc.fontSize(9).font('Helvetica');
-  const lblW = 110, valW = 160, col2X = 320;
-  // Left column
-  doc.font('Helvetica-Bold').text('Nama Santri', L, yy, { width: lblW, continued: true }).font('Helvetica').text(': ' + santri.nama);
+  // ── ZONA 2: IDENTITAS (6 kolom titik dua sejajar) ──
+  doc.fontSize(9);
+  const lbl1X = L, col1X = L + 85, val1X = L + 95;
+  const lbl2X = 320, col2X = 320 + 85, val2X = 320 + 95;
+  const dataW = 135;
+  // Baris 1
+  doc.font('Helvetica-Bold').text('Nama Santri', lbl1X, yy, { width: 85 });
+  doc.text(':', col1X, yy);
+  doc.font('Helvetica').text(santri.nama, val1X, yy, { width: dataW });
+  doc.font('Helvetica-Bold').text('Kelas Diniyyah', lbl2X, yy);
+  doc.text(':', col2X, yy);
+  doc.font('Helvetica').text(santri.kelas_diniyyah || '-', val2X, yy, { width: dataW });
   yy += 14;
-  doc.font('Helvetica-Bold').text('Asrama / Kamar', L, yy, { width: lblW, continued: true }).font('Helvetica').text(': ' + (kamar ? kamar.nama : '-'));
+  // Baris 2
+  doc.font('Helvetica-Bold').text('Asrama', lbl1X, yy, { width: 85 });
+  doc.text(':', col1X, yy);
+  doc.font('Helvetica').text(kamar ? kamar.nama : '-', val1X, yy, { width: dataW });
+  doc.font('Helvetica-Bold').text('Periode', lbl2X, yy);
+  doc.text(':', col2X, yy);
+  doc.font('Helvetica').text(periodeLabel, val2X, yy, { width: dataW });
   yy += 14;
-  doc.font('Helvetica-Bold').text('Alamat', L, yy, { width: lblW, continued: true }).font('Helvetica').text(': ' + (santri.alamat || '-'), { width: valW });
-  // Right column
-  let yy2 = yy - 28;
-  doc.font('Helvetica-Bold').text('Kelas Diniyyah', col2X, yy2, { width: lblW, continued: true }).font('Helvetica').text(': ' + (santri.kelas_diniyyah || '-'));
-  yy2 += 14;
-  doc.font('Helvetica-Bold').text('Orang Tua / Wali', col2X, yy2, { width: lblW, continued: true }).font('Helvetica').text(': ' + (wali ? wali.nama : '-'));
-  yy2 += 14;
-  doc.font('Helvetica-Bold').text('Periode', col2X, yy2, { width: lblW, continued: true }).font('Helvetica').text(': ' + periodeLabel);
-  yy = Math.max(yy + 14, yy2 + 14) + 8;
-  doc.moveTo(L, yy).lineTo(R, yy).lineWidth(0.5).stroke();
-  yy += 10;
+  // Baris 3
+  doc.font('Helvetica-Bold').text('Alamat', lbl1X, yy, { width: 85 });
+  doc.text(':', col1X, yy);
+  doc.font('Helvetica').text(santri.alamat || '-', val1X, yy, { width: dataW });
+  doc.font('Helvetica-Bold').text('Orang Tua', lbl2X, yy);
+  doc.text(':', col2X, yy);
+  doc.font('Helvetica').text(waliDisplay, val2X, yy, { width: dataW });
+  yy += 18;
+  // Garis bawah identitas (penuh)
+  doc.moveTo(L, yy - 4).lineTo(R, yy - 4).lineWidth(0.5).stroke();
+  yy += 8;
   // ── ZONA 3A: REKAP ABSENSI ──
-  doc.fontSize(11).font('Helvetica-Bold').text('A. Rekap Absensi', L, yy);
-  yy += 16;
+  doc.fontSize(10).font('Helvetica-Bold').text('A. Rekap Absensi', L, yy);
+  doc.moveTo(L, doc.y + 2).lineTo(L + 110, doc.y + 2).lineWidth(1).stroke();
+  yy = doc.y + 8;
   const colW2 = [140, 55, 55, 55, 55, 55];
   const headers2 = ['Kegiatan', 'Hadir', 'Izin', 'Sakit', 'Alpa', 'Total'];
+  // Header bar
+  doc.rect(L, yy - 3, colW2.reduce((a, b) => a + b, 0), 14).fill('#f0f0f0').fillColor('#000');
   doc.fontSize(8).font('Helvetica-Bold');
   let xx = L;
   headers2.forEach((h, i) => { doc.text(h, xx, yy, { width: colW2[i], align: i > 0 ? 'center' : 'left' }); xx += colW2[i]; });
   yy += 14;
   doc.moveTo(L, yy - 2).lineTo(L + colW2.reduce((a, b) => a + b, 0), yy - 2).lineWidth(0.5).stroke();
-  doc.font('Helvetica').fontSize(8);
+  doc.font('Helvetica').fontSize(8).fillColor('#000');
   Object.entries(rekap).forEach(([keg, r]) => {
     const t = r.H + r.I + r.S + r.A;
     xx = L;
@@ -728,66 +757,79 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
     });
     yy += 14;
   });
-  // Total row
+  // Garis atas TOTAL
+  doc.moveTo(L, yy - 2).lineTo(L + colW2.reduce((a, b) => a + b, 0), yy - 2).lineWidth(1).stroke();
   doc.font('Helvetica-Bold');
   xx = L;
   ['TOTAL', String(totalH), String(totalI), String(totalS), String(totalA), String(totalAll)].forEach((cell, i) => {
     doc.text(cell, xx, yy, { width: colW2[i], align: i > 0 ? 'center' : 'left' });
     xx += colW2[i];
   });
-  yy += 20;
+  yy += 22;
   // ── ZONA 3B: KEDISIPLINAN ──
-  doc.fontSize(11).font('Helvetica-Bold').text('B. Catatan Kedisiplinan', L, yy);
-  yy += 16;
+  doc.fontSize(10).font('Helvetica-Bold').text('B. Catatan Kedisiplinan', L, yy);
+  doc.moveTo(L, doc.y + 2).lineTo(L + 130, doc.y + 2).lineWidth(1).stroke();
+  yy = doc.y + 8;
   if (pelanggaranList.length) {
-    doc.fontSize(8).font('Helvetica');
+    doc.fontSize(8);
     pelanggaranList.forEach((p, i) => {
-      if (yy > 720) { doc.addPage(); yy = 40; }
+      if (yy > 710) { doc.addPage(); yy = 40; }
       doc.font('Helvetica-Bold').text((i + 1) + '. [' + p.tanggal + '] ' + p.jenis, L, yy, { width: W });
       yy += 12;
-      doc.font('Helvetica').text('   ' + (p.keterangan || '-') + (p.sanksi ? ' — Sanksi: ' + p.sanksi : ''), L, yy, { width: W });
+      doc.font('Helvetica').text((p.keterangan || '-') + (p.sanksi ? ' — Sanksi: ' + p.sanksi : ''), L + 15, yy, { width: W - 15 });
       yy += 14;
     });
   } else {
     doc.fontSize(9).font('Helvetica').text('Alhamdulillah, tidak ada catatan pelanggaran bulan ini.', L, yy, { width: W });
     yy += 14;
   }
-  yy += 10;
+  yy += 14;
   // ── ZONA 3C: PERKEMBANGAN ──
-  doc.fontSize(11).font('Helvetica-Bold').text('C. Laporan Perkembangan', L, yy);
-  yy += 16;
+  doc.fontSize(10).font('Helvetica-Bold').text('C. Laporan Perkembangan', L, yy);
+  doc.moveTo(L, doc.y + 2).lineTo(L + 135, doc.y + 2).lineWidth(1).stroke();
+  yy = doc.y + 8;
   if (catatanList.length) {
-    doc.fontSize(8);
     catatanList.forEach((c) => {
-      if (yy > 700) { doc.addPage(); yy = 40; }
+      if (yy > 680) { doc.addPage(); yy = 40; }
       const guru = db.users.find(u => u.id === c.created_by);
-      doc.font('Helvetica-Bold').text('[' + c.tanggal + '] ' + (c.judul || c.kategori) + ' — ' + (guru ? guru.nama : '-'), L, yy, { width: W });
-      yy += 12;
-      doc.font('Helvetica').text(c.isi, L + 10, yy, { width: W - 10 });
-      yy = doc.y + 8;
+      // Kotak narasi
+      const boxY = yy - 3;
+      doc.font('Helvetica-Bold').fontSize(8).text('[' + c.tanggal + '] ' + (c.judul || c.kategori) + ' — ' + (guru ? guru.nama : '-'), L + 5, yy, { width: W - 10 });
+      yy = doc.y + 2;
+      doc.font('Helvetica').fontSize(8).text(c.isi, L + 5, yy, { width: W - 10 });
+      const boxH = Math.max(doc.y - boxY + 8, 45);
+      doc.rect(L, boxY - 2, W, boxH).stroke('#cccccc');
+      yy = doc.y + 12;
     });
   } else {
-    doc.fontSize(9).font('Helvetica').text('Belum ada catatan perkembangan untuk periode ini.', L, yy, { width: W });
-    yy += 14;
+    doc.rect(L, yy - 2, W, 35).stroke('#cccccc');
+    doc.fontSize(8).font('Helvetica').text('Belum ada catatan perkembangan untuk periode ini.', L, yy + 8, { width: W, align: 'center', color: '#aaa' });
+    yy += 42;
   }
-  yy += 20;
+  yy += 14;
   // ── ZONA 4: PENGESAHAN ──
-  if (yy > 680) { doc.addPage(); yy = 40; }
+  if (yy > 660) { doc.addPage(); yy = 40; }
   const sigW = W / 3;
   doc.fontSize(9).font('Helvetica');
-  // Labels
+  // Kiri: Orang Tua
   doc.text('Orang Tua / Wali', L, yy, { width: sigW, align: 'center' });
+  // Tengah: Wali Kelas
   doc.text('Wali Kelas', L + sigW, yy, { width: sigW, align: 'center' });
-  doc.text('Kepala Yayasan', L + sigW * 2, yy, { width: sigW, align: 'center' });
-  yy += 50;
-  // Names under lines
-  doc.font('Helvetica-Bold');
-  doc.text(wali ? wali.nama : '-', L, yy, { width: sigW, align: 'center' });
-  doc.text('', L + sigW, yy, { width: sigW, align: 'center' }); // Wali Kelas: empty
-  doc.text(kepalaNama || '-', L + sigW * 2, yy, { width: sigW, align: 'center' });
-  // Print date
-  yy += 30;
-  doc.fontSize(8).font('Helvetica').text('Dicetak: ' + new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), L, yy, { width: W, align: 'right' });
+  // Kanan: Tempat/tanggal + Kepala Yayasan
+  doc.fontSize(8).text(tglStr, L + sigW * 2, yy, { width: sigW, align: 'center' });
+  yy += 12;
+  doc.fontSize(9).text('Kepala Yayasan', L + sigW * 2, yy, { width: sigW, align: 'center' });
+  yy += 40;
+  // Garis tanda tangan + nama
+  doc.font('Helvetica-Bold').fontSize(9);
+  // Wali - check kosong
+  doc.text(waliDisplay, L, yy, { width: sigW, align: 'center' });
+  doc.moveTo(L + 20, yy - 2).lineTo(L + sigW - 20, yy - 2).stroke();
+  // Wali Kelas - kosong
+  doc.moveTo(L + sigW + 20, yy - 2).lineTo(L + sigW * 2 - 20, yy - 2).stroke();
+  // Kepala Yayasan
+  doc.text(kepalaDisplay, L + sigW * 2, yy, { width: sigW, align: 'center' });
+  doc.moveTo(L + sigW * 2 + 20, yy - 2).lineTo(R - 20, yy - 2).stroke();
   doc.end();
 });
 

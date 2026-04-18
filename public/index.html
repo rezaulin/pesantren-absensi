@@ -1670,25 +1670,21 @@ async function loadRekapUstadz(){
   }
   let html='<div class="stats">';
   html+='<div class="stat-card"><div class="num">'+data.length+'</div><div class="label">Total Ustadz/Aktif</div></div>';
-  const totalAbsensi=data.reduce((s,r)=>s+r.total,0);
-  html+='<div class="stat-card"><div class="num">'+totalAbsensi+'</div><div class="label">Total Absensi</div></div>';
+  const totalSesi=data.reduce((s,r)=>s+r.total_sesi,0);
+  html+='<div class="stat-card"><div class="num">'+totalSesi+'</div><div class="label">Total Sesi Mengajar</div></div>';
   html+='</div>';
   data.forEach((u,idx)=>{
     html+='<div style="background:#fff;border-radius:14px;padding:1rem;margin-bottom:.8rem;box-shadow:var(--shadow)">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">';
     html+='<div><strong style="font-size:1rem">'+u.nama+'</strong> <span style="color:var(--text-muted);font-size:.8rem">@'+u.username+' ('+u.role+')</span></div>';
-    html+='<div style="text-align:right"><div style="font-size:1.3rem;font-weight:700;color:var(--primary)">'+u.total+'</div><div style="font-size:.7rem;color:var(--text-muted)">absensi</div></div>';
+    html+='<div style="text-align:right"><div style="font-size:1.3rem;font-weight:700;color:var(--primary)">'+u.total_sesi+'</div><div style="font-size:.7rem;color:var(--text-muted)">sesi mengajar</div></div>';
     html+='</div>';
     html+='<div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.5rem">📅 Aktif '+u.aktif_days+' hari</div>';
-    // Per kegiatan breakdown
+    // Per kegiatan breakdown (session count per kegiatan)
     html+='<div style="display:flex;gap:.4rem;flex-wrap:wrap">';
-    Object.entries(u.per_kegiatan).forEach(([nama,stat])=>{
+    Object.entries(u.per_kegiatan).forEach(([nama,count])=>{
       html+='<div style="background:var(--bg-alt);border-radius:8px;padding:.4rem .6rem;font-size:.75rem">';
-      html+='<strong>'+nama+'</strong>: '+stat.total;
-      html+=' <span style="color:#22c55e">H:'+stat.H+'</span>';
-      if(stat.I)html+=' <span style="color:#3b82f6">I:'+stat.I+'</span>';
-      if(stat.S)html+=' <span style="color:#eab308">S:'+stat.S+'</span>';
-      if(stat.A)html+=' <span style="color:#ef4444">A:'+stat.A+'</span>';
+      html+='<strong>'+nama+'</strong>: '+count+' sesi';
       html+='</div>';
     });
     html+='</div>';

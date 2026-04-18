@@ -1700,8 +1700,13 @@ async function hapusSetting(field,previewId,placeholderId){
     // Reset background langsung tanpa reload
     if(field==='dashboard_bg'){
       const grid=$('gridMenu');
-      if(grid){grid.style.background='';grid.style.borderRadius='';grid.style.padding=''}
-      document.querySelectorAll('.menu-item').forEach(item=>{item.style.background='';item.style.backdropFilter=''});
+      if(grid){grid.style.background='';grid.style.borderRadius='';grid.style.padding='';grid.style.marginTop=''}
+      document.querySelectorAll('.menu-item').forEach(item=>{
+        item.style.background='';item.style.backdropFilter='';item.style.webkitBackdropFilter='';
+        item.style.border='';item.style.boxShadow='';
+      });
+      document.querySelectorAll('.menu-label').forEach(el=>{el.style.color=''});
+      document.querySelectorAll('.menu-icon').forEach(el=>{el.style.background=''});
     }
     if(field==='background'){
       $('loginPage').style.background='';
@@ -1786,11 +1791,17 @@ async function loadAppSettings(){
         grid.style.padding='0.7rem';
         grid.style.marginTop='0.5rem';
       }
-      // Buat menu item sedikit transparan supaya background keliatan
+      // Efek frosted glass pada menu item
       document.querySelectorAll('.menu-item').forEach(item=>{
-        item.style.background='rgba(255,255,255,0.85)';
-        item.style.backdropFilter='blur(4px)';
+        item.style.background='rgba(255,255,255,0.7)';
+        item.style.backdropFilter='blur(8px)';
+        item.style.webkitBackdropFilter='blur(8px)';
+        item.style.border='1px solid rgba(255,255,255,0.4)';
+        item.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)';
       });
+      // Teks & icon gelap supaya terbaca
+      document.querySelectorAll('.menu-label').forEach(el=>{el.style.color='#1e293b'});
+      document.querySelectorAll('.menu-icon').forEach(el=>{el.style.background='rgba(13,148,136,0.15)'});
     }
   }catch(e){}
 }

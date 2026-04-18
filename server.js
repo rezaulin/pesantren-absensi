@@ -654,6 +654,7 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   const dataSettings = loadDB();
   const appName = (dataSettings.settings && dataSettings.settings.app_name) || 'Pesantren';
   const kepalaNama = (dataSettings.settings && dataSettings.settings.kepala_nama) || '';
+  const alamatLembaga = (dataSettings.settings && dataSettings.settings.alamat_lembaga) || '';
   const logoData = (dataSettings.settings && dataSettings.settings.logo) || '';
   // Periode label
   const bulanNama = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -696,7 +697,7 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   yy += 18;
   doc.fontSize(11).font('Helvetica-Bold').text('LAPORAN BULANAN PERKEMBANGAN SANTRI', textX, yy, { width: textW, align: 'center' });
   yy += 14;
-  doc.fontSize(8).font('Helvetica').text('Jl. Raya Kendal - Semarang, Kendal, Jawa Tengah', textX, yy, { width: textW, align: 'center' });
+  doc.fontSize(8).font('Helvetica').text(alamatLembaga || '', textX, yy, { width: textW, align: 'center' });
   yy += 14;
   // Garis ganda penuh
   doc.moveTo(L, yy + 4).lineTo(R, yy + 4).lineWidth(1.5).stroke();

@@ -1687,15 +1687,24 @@ function previewDashboardBg(input){
 async function saveSettings(){
   const appName=$('settingAppName').value;
   if(!appName)return toast('Nama wajib diisi');
-  await api('/api/settings',{method:'PUT',body:JSON.stringify({app_name:appName})});
-  const logoImg=$('logoPreview').querySelector('img');
-  if(logoImg&&logoImg.src.startsWith('data:')){await api('/api/settings/logo',{method:'POST',body:JSON.stringify({logo:logoImg.src})})}
-  const bgImg=$('bgPreview')?.querySelector('img');
-  if(bgImg&&bgImg.src.startsWith('data:')){await api('/api/settings/background',{method:'POST',body:JSON.stringify({background:bgImg.src})})}
-  const dashBgImg=$('dashboardBgPreview')?.querySelector('img');
-  if(dashBgImg&&dashBgImg.src.startsWith('data:')){await api('/api/settings/dashboard-bg',{method:'POST',body:JSON.stringify({dashboard_bg:dashBgImg.src})})}
-  toast('Pengaturan disimpan!');
-  loadAppSettings();
+  const btn=document.querySelector('[onclick="saveSettings()"]');
+  if(btn){btn.disabled=true;btn.textContent='Menyimpan...'}
+  try{
+    await api('/api/settings',{method:'PUT',body:JSON.stringify({app_name:appName})});
+    const logoImg=$('logoPreview').querySelector('img');
+    if(logoImg&&logoImg.src.startsWith('data:')){toast('Upload logo...');await api('/api/settings/logo',{method:'POST',body:JSON.stringify({logo:logoImg.src})})}
+    const bgImg=$('bgPreview')?.querySelector('img');
+    if(bgImg&&bgImg.src.startsWith('data:')){toast('Upload background login...');await api('/api/settings/background',{method:'POST',body:JSON.stringify({background:bgImg.src})})}
+    const dashBgImg=$('dashboardBgPreview')?.querySelector('img');
+    if(dashBgImg&&dashBgImg.src.startsWith('data:')){toast('Upload background dashboard...');await api('/api/settings/dashboard-bg',{method:'POST',body:JSON.stringify({dashboard_bg:dashBgImg.src})})}
+    toast('Pengaturan disimpan!');
+    loadAppSettings();
+  }catch(e){
+    toast('Error: '+(e.message||'Gagal simpan'));
+    console.error('saveSettings error:',e);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Simpan Pengaturan'}
+  }
 }
 
 async function loadAppSettings(){

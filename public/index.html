@@ -1294,14 +1294,14 @@ async function loadAbsenMalam(){
   if(kelompokVal)santriUrl+='kelompok_ngaji_malam='+encodeURIComponent(kelompokVal)+'&';
   const santri=await api(santriUrl);
   if(!santri)return;
-  // Find or create "Absen Malam" kegiatan
+  // Find "Absen Malam" kegiatan (bukan "Ngaji Malam")
   const kegiatanList=await api('/api/kegiatan');
-  let malamKegiatan=kegiatanList?kegiatanList.find(k=>k.nama.toLowerCase().includes('malam')):null;
-  if(!malamKegiatan){
+  let absenMalamKegiatan=kegiatanList?kegiatanList.find(k=>k.nama==='Absen Malam'):null;
+  if(!absenMalamKegiatan){
     if(!kegiatanList||!kegiatanList.length){$('malamGrid').innerHTML='<p style="text-align:center;color:#999;padding:1rem">Buat kegiatan "Absen Malam" dulu</p>';return}
-    malamKegiatan=kegiatanList[0];
+    absenMalamKegiatan=kegiatanList[0];
   }
-  const existing=await api('/api/absensi?tanggal='+tanggal+'&kegiatan_id='+malamKegiatan.id+(kamarId?'&kamar_id='+kamarId:''));
+  const existing=await api('/api/absensi?tanggal='+tanggal+'&kegiatan_id='+absenMalamKegiatan.id+(kamarId?'&kamar_id='+kamarId:''));
   const existingMap={};
   if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
   malamData={};
@@ -1321,12 +1321,12 @@ function setMalamStatus(id,status,el){
 async function simpanAbsenMalam(){
   const tanggal=$('malamTanggal').value;
   const kegiatanList=await api('/api/kegiatan');
-  let malamKegiatan=kegiatanList?kegiatanList.find(k=>k.nama.toLowerCase().includes('malam')):null;
-  if(!malamKegiatan&&kegiatanList&&kegiatanList.length)malamKegiatan=kegiatanList[0];
-  if(!malamKegiatan)return toast('Tidak ada kegiatan');
+  let absenMalamKegiatan=kegiatanList?kegiatanList.find(k=>k.nama==='Absen Malam'):null;
+  if(!absenMalamKegiatan&&kegiatanList&&kegiatanList.length)absenMalamKegiatan=kegiatanList[0];
+  if(!absenMalamKegiatan)return toast('Tidak ada kegiatan');
   const items=Object.entries(malamData).map(([sid,status])=>({santri_id:parseInt(sid),status,keterangan:''}));
   if(!items.length)return toast('Tidak ada data');
-  const res=await api('/api/absensi/bulk',{method:'POST',body:JSON.stringify({tanggal,kegiatan_id:malamKegiatan.id,items})});
+  const res=await api('/api/absensi/bulk',{method:'POST',body:JSON.stringify({tanggal,kegiatan_id:absenMalamKegiatan.id,items})});
   toast(res.message||'Absen malam tersimpan');
 }
 
@@ -1443,11 +1443,7 @@ async function loadRekap(){
     const kegiatanList=await api('/api/kegiatan');
     if(kegiatanList&&kegiatanList.length){
       if(!selectedRekapKegiatan)selectedRekapKegiatan=kegiatanList[0].id;
-      $('rekapTabs').innerHTML=kegiatanList.map(k=>{
-        let label=k.nama;
-        if(label.toLowerCase().includes('malam'))label='Absen Malam';
-        return '<div class="kegiatan-tab '+(k.id===selectedRekapKegiatan?'active':'')+'" onclick="selectRekapKegiatan('+k.id+')">'+label+'</div>';
-      }).join('');
+      $('rekapTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedRekapKegiatan?'active':'')+'" onclick="selectRekapKegiatan('+k.id+')">'+k.nama+'</div>').join('');
       await buildRekapFilter();
     }
   }
@@ -1655,10 +1651,8 @@ async function loadRaport(){
   html+='<div class=\"table-wrap\"><table><thead><tr><th>Kegiatan</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alfa</th><th>Total</th></tr></thead><tbody>';
   if(Object.keys(d.rekap).length){
     Object.entries(d.rekap).forEach(([keg,r])=>{
-      let label=keg;
-      if(label.toLowerCase().includes('malam'))label='Absen Malam';
       const total=r.H+r.I+r.S+r.A;
-      html+='<tr><td>'+label+'</td><td style="color:var(--green)">'+r.H+'</td><td style="color:#f9a825">'+r.I+'</td><td style="color:var(--blue)">'+r.S+'</td><td style="color:var(--red)">'+r.A+'</td><td><b>'+total+'</b></td></tr>';
+      html+='<tr><td>'+keg+'</td><td style="color:var(--green)">'+r.H+'</td><td style="color:#f9a825">'+r.I+'</td><td style="color:var(--blue)">'+r.S+'</td><td style="color:var(--red)">'+r.A+'</td><td><b>'+total+'</b></td></tr>';
     });
   }else{
     html+='<tr><td colspan=\"6\" style=\"text-align:center;padding:1rem\">Tidak ada data absensi</td></tr>';

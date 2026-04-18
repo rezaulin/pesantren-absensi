@@ -723,14 +723,16 @@ tr:hover{background:var(--bg)}
       <div class="filter-bar">
         <input type="date" id="rekapDari">
         <input type="date" id="rekapSampai">
-        <select id="rekapKamar"><option value="">Semua Kamar</option></select>
-        <select id="rekapKegiatan" onchange="rekapKegiatanChanged()"><option value="">Semua Kegiatan</option></select>
-        <span id="rekapFilterLabel" style="font-size:.75rem;color:#666"></span>
-        <select id="rekapFilter" style="display:none"><option value="">Semua</option></select>
         <button class="btn btn-primary btn-sm" onclick="loadRekap()">Filter</button>
         <button class="btn btn-outline btn-sm" onclick="exportPDF()">📥 PDF</button>
       </div>
-      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Santri</th><th>Kamar</th><th>Kegiatan</th><th>Status</th><th>Ket</th></tr></thead><tbody id="rekapBody"></tbody></table></div>
+      <div class="kegiatan-tabs" id="rekapTabs"></div>
+      <div id="rekapFilterArea" style="margin:.5rem 0;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <select id="rekapKamar" onchange="loadRekap()"><option value="">Semua Kamar</option></select>
+        <span id="rekapFilterLabel" style="font-size:.75rem;color:#666"></span>
+        <select id="rekapFilter" style="display:none" onchange="loadRekap()"><option value="">Semua</option></select>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Santri</th><th>Kamar</th><th>Status</th><th>Ket</th></tr></thead><tbody id="rekapBody"></tbody></table></div>
     </div>
 
     <!-- LAPORAN -->
@@ -1410,21 +1412,24 @@ async function loadKegiatan(){
   $('kegiatanBody').innerHTML=data.map((k,i)=>'<tr><td>'+(i+1)+'</td><td>'+k.nama+'</td><td><button class="btn btn-sm btn-outline" onclick="showModal(\'kegiatan\',\''+encodeURIComponent(JSON.stringify(k))+'\')">✏️</button> <button class="btn btn-sm btn-danger" onclick="hapus(\'kegiatan\','+k.id+')">🗑️</button></td></tr>').join('')||'<tr><td colspan="3">Belum ada kegiatan</td></tr>';
 }
 
-// Rekap - dynamic filter per kegiatan
-async function rekapKegiatanChanged(){
-  const kegId=$('rekapKegiatan').value;
+// Rekap - tab system like absensi
+let selectedRekapKegiatan=null;
+
+async function selectRekapKegiatan(id){
+  selectedRekapKegiatan=id;
+  await buildRekapFilter();
+  loadRekap();
+}
+async function buildRekapFilter(){
   const sel=$('rekapFilter');
   const lbl=$('rekapFilterLabel');
   sel.innerHTML='<option value="">Semua</option>';
-  if(!kegId){sel.style.display='none';lbl.textContent='';return}
-  // Get kegiatan name
+  if(!selectedRekapKegiatan){sel.style.display='none';lbl.textContent='';return}
   const kegiatanList=await api('/api/kegiatan');
-  const keg=kegiatanList?.find(k=>k.id==kegId);
+  const keg=kegiatanList?.find(k=>k.id==selectedRekapKegiatan);
   if(!keg){sel.style.display='none';lbl.textContent='';return}
-  // Check filter rule
   const filter=getFilterForKegiatan(keg.nama);
   if(!filter){sel.style.display='none';lbl.textContent='';return}
-  // Build dropdown
   const santri=await api('/api/santri')||[];
   const vals=[...new Set(santri.map(s=>s[filter.field]).filter(Boolean))].sort();
   if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
@@ -1433,23 +1438,30 @@ async function rekapKegiatanChanged(){
   lbl.textContent=filter.label;
 }
 async function loadRekap(){
-  const [kamar,kegiatanList]=await Promise.all([api('/api/kamar'),api('/api/kegiatan')]);
-  if(kamar&&$('rekapKamar').options.length<=1){
-    kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('rekapKamar').appendChild(o)});
+  // Populate kegiatan tabs (first load)
+  if(!$('rekapTabs').innerHTML){
+    const kegiatanList=await api('/api/kegiatan');
+    if(kegiatanList&&kegiatanList.length){
+      if(!selectedRekapKegiatan)selectedRekapKegiatan=kegiatanList[0].id;
+      $('rekapTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedRekapKegiatan?'active':'')+'" onclick="selectRekapKegiatan('+k.id+')">'+k.nama+'</div>').join('');
+      await buildRekapFilter();
+    }
   }
-  if(kegiatanList&&$('rekapKegiatan').options.length<=1){
-    kegiatanList.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('rekapKegiatan').appendChild(o)});
+  // Populate kamar dropdown
+  if($('rekapKamar').options.length<=1){
+    const kamar=await api('/api/kamar');
+    if(kamar)kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;$('rekapKamar').appendChild(o)});
   }
   const params=new URLSearchParams();
   if($('rekapDari').value)params.set('dari',$('rekapDari').value);
   if($('rekapSampai').value)params.set('sampai',$('rekapSampai').value);
   if($('rekapKamar').value)params.set('kamar_id',$('rekapKamar').value);
-  if($('rekapKegiatan').value)params.set('kegiatan_id',$('rekapKegiatan').value);
+  if(selectedRekapKegiatan)params.set('kegiatan_id',selectedRekapKegiatan);
   // Dynamic kelompok filter
   const filterVal=$('rekapFilter').value;
-  if(filterVal){
-    const kegId=$('rekapKegiatan').value;
-    const keg=kegiatanList?.find(k=>k.id==kegId);
+  if(filterVal&&selectedRekapKegiatan){
+    const kegiatanList=await api('/api/kegiatan');
+    const keg=kegiatanList?.find(k=>k.id==selectedRekapKegiatan);
     if(keg){
       const filter=getFilterForKegiatan(keg.nama);
       if(filter)params.set(filter.field,filterVal);
@@ -1458,7 +1470,7 @@ async function loadRekap(){
   const data=await api('/api/rekap?'+params);
   if(!data)return;
   const statusMap={H:'✅ Hadir',I:'📝 Izin',S:'🤒 Sakit',A:'❌ Alfa'};
-  $('rekapBody').innerHTML=data.map(r=>'<tr><td>'+r.tanggal+'</td><td>'+r.nama+'</td><td>'+(r.kamar_nama||'-')+'</td><td>'+(r.kegiatan_nama||'-')+'</td><td>'+(statusMap[r.status]||r.status)+'</td><td>'+(r.keterangan||'-')+'</td></tr>').join('')||'<tr><td colspan="6" style="text-align:center;padding:1rem">Tidak ada data</td></tr>';
+  $('rekapBody').innerHTML=data.map(r=>'<tr><td>'+r.tanggal+'</td><td>'+r.nama+'</td><td>'+(r.kamar_nama||'-')+'</td><td>'+(statusMap[r.status]||r.status)+'</td><td>'+(r.keterangan||'-')+'</td></tr>').join('')||'<tr><td colspan="5" style="text-align:center;padding:1rem">Tidak ada data</td></tr>';
 }
 
 // Sensus
@@ -1682,7 +1694,7 @@ function exportPDF(){
   const dari=$('rekapDari')?.value||'';
   const sampai=$('rekapSampai')?.value||'';
   const kamar=$('rekapKamar')?.value||'';
-  const kegiatan=$('rekapKegiatan')?.value||'';
+  const kegiatan=selectedRekapKegiatan||'';
   let url='/api/export/pdf?';
   if(dari)url+='dari='+dari+'&';
   if(sampai)url+='sampai='+sampai+'&';

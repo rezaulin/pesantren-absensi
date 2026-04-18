@@ -20,7 +20,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 // ── JSON Database ──────────────────────────────────────
 function loadDB() {
   if (fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
-  return { users: [], kamar: [], santri: [], absensi: [], pengumuman: [], kegiatan: [] };
+  return { users: [], kamar: [], santri: [], absensi: [], absen_malam: [], absen_sekolah: [], pengumuman: [], kegiatan: [] };
 }
 function saveDB(data) { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); }
 function nextId(arr) { return arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1; }
@@ -218,13 +218,14 @@ app.get('/api/santri', authenticate, (req, res) => {
   }));
 });
 app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
-  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah, kelompok_ngaji_malam, wali_user_id } = req.body;
+  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah, kelompok_ngaji_malam, wali_user_id, extra } = req.body;
   if (!nama || !kamar_id) return res.status(400).json({ message: 'Nama & kamar wajib' });
   const s = {
     id: nextId(db.santri), nama, kamar_id: parseInt(kamar_id), status: status || 'aktif',
     kelas_diniyyah: kelas_diniyyah || '', kelompok_ngaji: kelompok_ngaji || '',
     jenis_bakat: jenis_bakat || '', kelas_sekolah: kelas_sekolah || '',
     kelompok_ngaji_malam: kelompok_ngaji_malam || '',
+    extra: extra || {},
     wali_user_id: wali_user_id ? parseInt(wali_user_id) : null,
     extra: req.body.extra || {},
     created_at: new Date().toISOString()
@@ -305,8 +306,98 @@ app.post('/api/absensi/bulk', authenticate, (req, res) => {
   saveDB(db); res.json({ message: 'Absensi tersimpan' });
 });
 
+// ── Absen Malam (Tabel Terpisah) ───────────────────────
+app.get('/api/absen-malam', authenticate, (req, res) => {
+  let list = db.absen_malam || [];
+  if (req.query.tanggal) list = list.filter(a => a.tanggal === req.query.tanggal);
+  if (req.query.kamar_id) {
+    const santriIds = db.santri.filter(s => s.kamar_id == req.query.kamar_id).map(s => s.id);
+    list = list.filter(a => santriIds.includes(a.santri_id));
+  }
+  res.json(list.map(a => {
+    const s = db.santri.find(x => x.id === a.santri_id);
+    const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+    return { ...a, nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-' };
+  }));
+});
+
+app.post('/api/absen-malam/bulk', authenticate, (req, res) => {
+  if (req.user.role === 'wali') return res.status(403).json({ message: 'Wali tidak bisa mengubah absensi' });
+  if (!db.absen_malam) db.absen_malam = [];
+  const { tanggal, items } = req.body;
+  if (!tanggal || !items) return res.status(400).json({ message: 'Data tidak lengkap (tanggal, items wajib)' });
+  items.forEach(item => {
+    const existing = db.absen_malam.find(a => a.santri_id === item.santri_id && a.tanggal === tanggal);
+    if (existing) { existing.status = item.status; existing.keterangan = item.keterangan || ''; existing.recorded_by = req.user.id; }
+    else db.absen_malam.push({ id: nextId(db.absen_malam), santri_id: item.santri_id, tanggal, status: item.status, keterangan: item.keterangan || '', recorded_by: req.user.id, created_at: new Date().toISOString() });
+  });
+  saveDB(db); res.json({ message: 'Absen malam tersimpan' });
+});
+
+// ── Absen Sekolah (Tabel Terpisah) ─────────────────────
+app.get('/api/absen-sekolah', authenticate, (req, res) => {
+  let list = db.absen_sekolah || [];
+  if (req.query.tanggal) list = list.filter(a => a.tanggal === req.query.tanggal);
+  if (req.query.kelas_sekolah) {
+    const santriIds = db.santri.filter(s => s.kelas_sekolah === req.query.kelas_sekolah).map(s => s.id);
+    list = list.filter(a => santriIds.includes(a.santri_id));
+  }
+  res.json(list.map(a => {
+    const s = db.santri.find(x => x.id === a.santri_id);
+    const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+    return { ...a, nama: s ? s.nama : '-', kelas_sekolah: s ? s.kelas_sekolah || '-' : '-', kamar_nama: k ? k.nama : '-' };
+  }));
+});
+
+app.post('/api/absen-sekolah/bulk', authenticate, (req, res) => {
+  if (req.user.role === 'wali') return res.status(403).json({ message: 'Wali tidak bisa mengubah absensi' });
+  if (!db.absen_sekolah) db.absen_sekolah = [];
+  const { tanggal, items } = req.body;
+  if (!tanggal || !items) return res.status(400).json({ message: 'Data tidak lengkap (tanggal, items wajib)' });
+  items.forEach(item => {
+    const existing = db.absen_sekolah.find(a => a.santri_id === item.santri_id && a.tanggal === tanggal);
+    if (existing) { existing.status = item.status; existing.keterangan = item.keterangan || ''; existing.recorded_by = req.user.id; }
+    else db.absen_sekolah.push({ id: nextId(db.absen_sekolah), santri_id: item.santri_id, tanggal, status: item.status, keterangan: item.keterangan || '', recorded_by: req.user.id, created_at: new Date().toISOString() });
+  });
+  saveDB(db); res.json({ message: 'Absen sekolah tersimpan' });
+});
+
 // ── Rekap ──────────────────────────────────────────────
 app.get('/api/rekap', authenticate, (req, res) => {
+  // Rekap Absen Malam - tabel terpisah
+  if (req.query.tipe === 'absen_malam') {
+    let list = db.absen_malam || [];
+    if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
+    if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
+    const santriFilters = ['kamar_id', 'kelompok_ngaji_malam'];
+    santriFilters.forEach(f => {
+      if (req.query[f]) {
+        const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);
+        list = list.filter(a => santriIds.includes(a.santri_id));
+      }
+    });
+    return res.json(list.map(a => {
+      const s = db.santri.find(x => x.id === a.santri_id);
+      const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+      return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-', kegiatan_nama: 'Absen Malam', status: a.status, keterangan: a.keterangan };
+    }).sort((a, b) => b.tanggal.localeCompare(a.tanggal)));
+  }
+  // Rekap Absen Sekolah - tabel terpisah
+  if (req.query.tipe === 'absen_sekolah') {
+    let list = db.absen_sekolah || [];
+    if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
+    if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
+    if (req.query.kelas_sekolah) {
+      const santriIds = db.santri.filter(s => s.kelas_sekolah === req.query.kelas_sekolah).map(s => s.id);
+      list = list.filter(a => santriIds.includes(a.santri_id));
+    }
+    return res.json(list.map(a => {
+      const s = db.santri.find(x => x.id === a.santri_id);
+      const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+      return { tanggal: a.tanggal, nama: s ? s.nama : '-', kamar_nama: k ? k.nama : '-', kegiatan_nama: 'Sekolah Formal', status: a.status, keterangan: a.keterangan };
+    }).sort((a, b) => b.tanggal.localeCompare(a.tanggal)));
+  }
+  // Rekap Absensi biasa
   let list = db.absensi;
   if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
   if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
@@ -456,6 +547,28 @@ app.get('/api/raport/:santri_id', authenticate, (req, res) => {
     rekap[nama][a.status] = (rekap[nama][a.status] || 0) + 1;
     rekap[nama].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
   });
+  // Tambah Absen Malam dari tabel terpisah
+  let absenMalamList = (db.absen_malam || []).filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absenMalamList = absenMalamList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absenMalamList = absenMalamList.filter(a => a.tanggal <= req.query.sampai);
+  if (absenMalamList.length) {
+    rekap['Absen Malam'] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+    absenMalamList.forEach(a => {
+      rekap['Absen Malam'][a.status] = (rekap['Absen Malam'][a.status] || 0) + 1;
+      rekap['Absen Malam'].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
+    });
+  }
+  // Tambah Absen Sekolah dari tabel terpisah
+  let absenSekolahList = (db.absen_sekolah || []).filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absenSekolahList = absenSekolahList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absenSekolahList = absenSekolahList.filter(a => a.tanggal <= req.query.sampai);
+  if (absenSekolahList.length) {
+    rekap['Sekolah Formal'] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+    absenSekolahList.forEach(a => {
+      rekap['Sekolah Formal'][a.status] = (rekap['Sekolah Formal'][a.status] || 0) + 1;
+      rekap['Sekolah Formal'].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
+    });
+  }
   res.json({
     santri: { ...santri, kamar_nama: kamar ? kamar.nama : '-' },
     periode: { dari: req.query.dari || '-', sampai: req.query.sampai || '-' },

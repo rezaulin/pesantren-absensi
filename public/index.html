@@ -687,7 +687,7 @@ tr:hover{background:var(--bg)}
         <h3 class="section-title" style="margin:0">Data Santri</h3>
         <button class="btn btn-primary btn-sm" onclick="showModal('santri')" id="btnTambahSantri">+ Tambah</button>
       </div>
-      <div class="table-wrap"><table id="santriTable"><thead><tr><th>No</th><th>Nama</th><th>Kamar</th><th>Kls Diniyyah</th><th>Klp Ngaji</th><th>Ngaji Malam</th><th>Kls Sekolah</th><th>Bakat</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="santriTable"><thead><tr id="santriHead"><th>No</th><th>Nama</th><th>Kamar</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <!-- KAMAR -->
@@ -729,6 +729,7 @@ tr:hover{background:var(--bg)}
       <div class="kegiatan-tabs" id="rekapTabs"></div>
       <div id="rekapFilterArea" style="margin:.5rem 0;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
         <select id="rekapKamar" onchange="loadRekap()"><option value="">Semua Kamar</option></select>
+        <select id="rekapKelas" style="display:none" onchange="loadRekap()"><option value="">Semua Kelas</option></select>
         <span id="rekapFilterLabel" style="font-size:.75rem;color:#666"></span>
         <select id="rekapFilter" style="display:none" onchange="loadRekap()"><option value="">Semua</option></select>
       </div>
@@ -1165,35 +1166,54 @@ function getFilterForKegiatan(nama){
   }
   return null;
 }
-async function buildFilterDropdown(kegNama){
-  let filter=getFilterForKegiatan(kegNama);
+async function buildFilterDropdown(kegNama,kegId){
+  const filter=getFilterForKegiatan(kegNama);
   const sel=$('absensiFilter');
   const lbl=$('absensiFilterLabel');
   sel.innerHTML='<option value="">Semua</option>';
-  // If no standard filter, check extra fields
-  if(!filter){
-    allSantriCache=await api('/api/santri')||[];
-    const extraVals=[...new Set(allSantriCache.filter(s=>s.extra&&s.extra[kegNama]).map(s=>s.extra[kegNama]))].sort();
-    if(extraVals.length>0){
-      filter={field:'extra.'+kegNama,label:kegNama,isExtra:true,key:kegNama};
-    }else{sel.style.display='none';lbl.textContent='';return}
-  }
-  sel.style.display='';
   // Always refresh santri cache for auto-sync
-  if(!allSantriCache.length)allSantriCache=await api('/api/santri')||[];
-  if(filter.isExtra){
-    const vals=[...new Set(allSantriCache.filter(s=>s.extra&&s.extra[filter.key]).map(s=>s.extra[filter.key]))].sort();
-    if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
-    vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
-  }else if(filter.field==='kamar_id'){
-    const kamar=await api('/api/kamar');
-    if(kamar)kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;sel.appendChild(o)});
+  allSantriCache=await api('/api/santri')||[];
+  if(filter){
+    // Kegiatan mapped — ambil dari field tetap
+    sel.style.display='';
+    if(filter.field==='kamar_id'){
+      const kamar=await api('/api/kamar');
+      if(kamar)kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;sel.appendChild(o)});
+    }else{
+      // Cek apakah field sudah dipakai kegiatan lain sebelumnya
+      const kegList=await api('/api/kegiatan')||[];
+      const usedFields=new Set();
+      let myFieldUsed=false;
+      for(const k of kegList){
+        const r=filterRules.find(r2=>k.nama.toLowerCase().includes(r2.match));
+        if(r&&!usedFields.has(r.field)){
+          usedFields.add(r.field);
+          if(k.id===kegId)break;
+        }else if(k.id===kegId){
+          myFieldUsed=true;break;
+        }
+      }
+      if(myFieldUsed){
+        // Field sudah dipakai — ambil dari extra
+        const vals=[...new Set(allSantriCache.map(s=>s.extra?.[kegId]).filter(Boolean))].sort();
+        if(vals.length===0){sel.style.display='none';lbl.textContent=kegNama+' (belum ada data)';return}
+        vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
+        lbl.textContent='Filter: '+kegNama;
+      }else{
+        const vals=[...new Set(allSantriCache.map(s=>s[filter.field]).filter(Boolean))].sort();
+        if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
+        vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
+        lbl.textContent='Filter: '+filter.label;
+      }
+    }
   }else{
-    const vals=[...new Set(allSantriCache.map(s=>s[filter.field]).filter(Boolean))].sort();
-    if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
+    // Kegiatan extra — ambil dari santri.extra[id]
+    const vals=[...new Set(allSantriCache.map(s=>s.extra?.[kegId]).filter(Boolean))].sort();
+    if(vals.length===0){sel.style.display='none';lbl.textContent=kegNama+' (belum ada data)';return}
+    sel.style.display='';
     vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
+    lbl.textContent='Filter: '+kegNama;
   }
-  lbl.textContent='Filter: '+filter.label;
 }
 async function loadAbsensi(){
   const today=new Date().toISOString().slice(0,10);
@@ -1202,29 +1222,33 @@ async function loadAbsensi(){
   const tanggal=$('absensiTanggal').value;
   const kegiatanList=await api('/api/kegiatan');
   if(kegiatanList&&kegiatanList.length){
-    if(!selectedKegiatan){selectedKegiatan=kegiatanList[0].id;await buildFilterDropdown(kegiatanList[0].nama)}
+    if(!selectedKegiatan){selectedKegiatan=kegiatanList[0].id;await buildFilterDropdown(kegiatanList[0].nama,selectedKegiatan)}
     $('kegiatanTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedKegiatan?'active':'')+'" onclick="selectKegiatan('+k.id+')">'+k.nama+'</div>').join('');
   }
-  const kegName=kegiatanList?kegiatanList.find(k=>k.id===selectedKegiatan)?.nama||'';
-  let filter=getFilterForKegiatan(kegName);
-  // Check extra if no standard filter
-  if(!filter&&kegName){
-    if(!allSantriCache.length)allSantriCache=await api('/api/santri')||[];
-    const hasExtra=allSantriCache.some(s=>s.extra&&s.extra[kegName]);
-    if(hasExtra)filter={field:'extra.'+kegName,label:kegName,isExtra:true,key:kegName};
-  }
+  const kegName=kegiatanList?kegiatanList.find(k=>k.id===selectedKegiatan)?.nama||'':'';
+  const filter=getFilterForKegiatan(kegName);
   let santriUrl='/api/santri';
   let absensiUrl='/api/absensi?tanggal='+tanggal+'&kegiatan_id='+selectedKegiatan;
-  if(filterVal&&filter){
-    if(filter.isExtra){
-      absensiUrl+='&extra_key='+encodeURIComponent(filter.key)+'&extra_val='+encodeURIComponent(filterVal);
-    }else{
-      santriUrl+='?'+filter.field+'='+encodeURIComponent(filterVal);
-      absensiUrl+='&'+filter.field+'='+encodeURIComponent(filterVal);
+  // Cek apakah field sudah dipakai kegiatan lain
+  let useExtra=false;
+  if(filter){
+    const usedFields=new Set();
+    for(const k of kegiatanList){
+      const r=filterRules.find(r2=>k.nama.toLowerCase().includes(r2.match));
+      if(r&&!usedFields.has(r.field)){usedFields.add(r.field);if(k.id===selectedKegiatan)break;}
+      else if(k.id===selectedKegiatan){useExtra=true;break;}
     }
   }
-  const [santri,existing]=await Promise.all([api(santriUrl),api(absensiUrl)]);
+  if(filterVal&&!useExtra&&filter){
+    santriUrl+='?'+filter.field+'='+encodeURIComponent(filterVal);
+    absensiUrl+='&'+filter.field+'='+encodeURIComponent(filterVal);
+  }
+  let [santri,existing]=await Promise.all([api(santriUrl),api(absensiUrl)]);
   if(!santri)return;
+  // Client-side filter untuk extra kegiatan
+  if(filterVal&&(useExtra||!filter)){
+    santri=santri.filter(s=>(s.extra?.[selectedKegiatan])===filterVal);
+  }
   const existingMap={};
   if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
   absensiData={};
@@ -1232,7 +1256,10 @@ async function loadAbsensi(){
     const ex=existingMap[s.id];
     const st=ex?ex.status:'H';
     absensiData[s.id]=st;
-    const sub=filter?(filter.isExtra?(s.extra?.[filter.key]||'-'):(s[filter.field]||'-')):(s.kamar_nama||'-');
+    let sub;
+    if(!useExtra&&filter){sub=s[filter.field]||'-'}
+    else if(filter){sub=s.extra?.[selectedKegiatan]||'-'}
+    else{sub=s.extra?.[selectedKegiatan]||s.kamar_nama||'-'}
     return {id:s.id,nama:s.nama,sub,idx:i+1};
   });
   renderAbsensiGrid();
@@ -1281,7 +1308,7 @@ async function selectKegiatan(id){
   const kegiatanList=await api('/api/kegiatan');
   const keg=kegiatanList?kegiatanList.find(k=>k.id===id):null;
   selectedKegiatan=id;
-  if(keg)await buildFilterDropdown(keg.nama);
+  if(keg)await buildFilterDropdown(keg.nama,id);
   if($('searchSantri'))$('searchSantri').value='';
   loadAbsensi();
 }
@@ -1320,14 +1347,8 @@ async function loadAbsenMalam(){
   if(kelompokVal)santriUrl+='kelompok_ngaji_malam='+encodeURIComponent(kelompokVal)+'&';
   const santri=await api(santriUrl);
   if(!santri)return;
-  // Find "Absen Malam" kegiatan (bukan "Ngaji Malam")
-  const kegiatanList=await api('/api/kegiatan');
-  let absenMalamKegiatan=kegiatanList?kegiatanList.find(k=>k.nama==='Absen Malam'):null;
-  if(!absenMalamKegiatan){
-    if(!kegiatanList||!kegiatanList.length){$('malamGrid').innerHTML='<p style="text-align:center;color:#999;padding:1rem">Buat kegiatan "Absen Malam" dulu</p>';return}
-    absenMalamKegiatan=kegiatanList[0];
-  }
-  const existing=await api('/api/absensi?tanggal='+tanggal+'&kegiatan_id='+absenMalamKegiatan.id+(kamarId?'&kamar_id='+kamarId:''));
+  // Ambil data absen malam dari tabel terpisah
+  const existing=await api('/api/absen-malam?tanggal='+tanggal+(kamarId?'&kamar_id='+kamarId:''));
   const existingMap={};
   if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
   malamData={};
@@ -1346,13 +1367,9 @@ function setMalamStatus(id,status,el){
 }
 async function simpanAbsenMalam(){
   const tanggal=$('malamTanggal').value;
-  const kegiatanList=await api('/api/kegiatan');
-  let absenMalamKegiatan=kegiatanList?kegiatanList.find(k=>k.nama==='Absen Malam'):null;
-  if(!absenMalamKegiatan&&kegiatanList&&kegiatanList.length)absenMalamKegiatan=kegiatanList[0];
-  if(!absenMalamKegiatan)return toast('Tidak ada kegiatan');
   const items=Object.entries(malamData).map(([sid,status])=>({santri_id:parseInt(sid),status,keterangan:''}));
   if(!items.length)return toast('Tidak ada data');
-  const res=await api('/api/absensi/bulk',{method:'POST',body:JSON.stringify({tanggal,kegiatan_id:absenMalamKegiatan.id,items})});
+  const res=await api('/api/absen-malam/bulk',{method:'POST',body:JSON.stringify({tanggal,items})});
   toast(res.message||'Absen malam tersimpan');
 }
 
@@ -1374,10 +1391,8 @@ async function loadAbsenSekolah(){
   // Filter santri by kelas if selected
   let santri=allSantri;
   if(kelasFilter)santri=allSantri.filter(s=>s.kelas_sekolah===kelasFilter);
-  const kegiatanList=await api('/api/kegiatan');
-  let sekolahKegiatan=kegiatanList?kegiatanList.find(k=>k.nama.toLowerCase().includes('sekolah')):null;
-  if(!sekolahKegiatan){$('sekolahGrid').innerHTML='<p style="text-align:center;color:#999;padding:1rem">Buat kegiatan "Sekolah Formal" dulu</p>';return}
-  const existing=await api('/api/absensi?tanggal='+tanggal+'&kegiatan_id='+sekolahKegiatan.id);
+  // Ambil data absen sekolah dari tabel terpisah
+  const existing=await api('/api/absen-sekolah?tanggal='+tanggal+(kelasFilter?'&kelas_sekolah='+encodeURIComponent(kelasFilter):''));
   const existingMap={};
   if(existing)existing.forEach(e=>{existingMap[e.santri_id]=e});
   sekolahData={};
@@ -1396,12 +1411,9 @@ function setSekolahStatus(id,status,el){
 }
 async function simpanAbsenSekolah(){
   const tanggal=$('sekolahTanggal').value;
-  const kegiatanList=await api('/api/kegiatan');
-  let sekolahKegiatan=kegiatanList?kegiatanList.find(k=>k.nama.toLowerCase().includes('sekolah')):null;
-  if(!sekolahKegiatan)return toast('Tidak ada kegiatan Sekolah Formal');
   const items=Object.entries(sekolahData).map(([sid,status])=>({santri_id:parseInt(sid),status,keterangan:''}));
   if(!items.length)return toast('Tidak ada data');
-  const res=await api('/api/absensi/bulk',{method:'POST',body:JSON.stringify({tanggal,kegiatan_id:sekolahKegiatan.id,items})});
+  const res=await api('/api/absen-sekolah/bulk',{method:'POST',body:JSON.stringify({tanggal,items})});
   toast(res.message||'Absen sekolah tersimpan');
 }
 
@@ -1409,7 +1421,39 @@ async function simpanAbsenSekolah(){
 async function loadSantri(){
   const data=await api('/api/santri');
   if(!data)return;
-  $('santriTable').querySelector('tbody').innerHTML=data.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+s.nama+'</td><td>'+(s.kamar_nama||'-')+'</td><td>'+(s.kelas_diniyyah||'-')+'</td><td>'+(s.kelompok_ngaji||'-')+'</td><td>'+(s.kelompok_ngaji_malam||'-')+'</td><td>'+(s.kelas_sekolah||'-')+'</td><td>'+(s.jenis_bakat||'-')+'</td><td><span style="color:'+(s.status==='aktif'?'green':'red')+'">'+s.status+'</span></td><td>'+(me.role==='admin'?'<button class="btn btn-outline btn-sm" onclick="editSantri('+s.id+')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus(\'santri\','+s.id+')">🗑️</button>':'')+'</td></tr>').join('');
+  // Generate kolom kegiatan dinamis
+  const kegiatanList=await api('/api/kegiatan')||[];
+  const kegiatanCols=[];
+  const usedFields=new Set();
+  kegiatanList.forEach(k=>{
+    const rule=filterRules.find(r=>k.nama.toLowerCase().includes(r.match));
+    if(rule&&!usedFields.has(rule.field)){
+      usedFields.add(rule.field);
+      kegiatanCols.push({field:rule.field,label:rule.label});
+    }else{
+      kegiatanCols.push({field:'extra.'+k.id,label:k.nama,isExtra:true});
+    }
+  });
+  // Build header
+  let headHtml='<th>No</th><th>Nama</th><th>Kamar</th>';
+  kegiatanCols.forEach(c=>{headHtml+='<th>'+c.label+'</th>'});
+  headHtml+='<th>Status</th><th>Aksi</th>';
+  $('santriHead').innerHTML=headHtml;
+  // Build rows
+  $('santriTable').querySelector('tbody').innerHTML=data.map((s,i)=>{
+    let row='<tr><td>'+(i+1)+'</td><td>'+s.nama+'</td><td>'+(s.kamar_nama||'-')+'</td>';
+    kegiatanCols.forEach(c=>{
+      if(c.isExtra){
+        const kid=c.field.split('.')[1];
+        row+='<td>'+(s.extra?.[kid]||'-')+'</td>';
+      }else{
+        row+='<td>'+(s[c.field]||'-')+'</td>';
+      }
+    });
+    row+='<td><span style="color:'+(s.status==='aktif'?'green':'red')+'">'+s.status+'</span></td>';
+    row+='<td>'+(me.role==='admin'?'<button class="btn btn-outline btn-sm" onclick="editSantri('+s.id+')">✏️</button> <button class="btn btn-danger btn-sm" onclick="hapus(\'santri\','+s.id+')">🗑️</button>':'')+'</td></tr>';
+    return row;
+  }).join('');
   if($('btnTambahSantri'))$('btnTambahSantri').style.display=me.role==='admin'?'':'none';
 }
 function editSantri(id){api('/api/santri').then(data=>{const s=data.find(x=>x.id===id);if(s)showModal('santri',s)})}
@@ -1440,9 +1484,28 @@ async function loadKegiatan(){
 
 // Rekap - tab system like absensi
 let selectedRekapKegiatan=null;
+const ABSEN_MALAM_TAB='absen_malam';
+const ABSEN_SEKOLAH_TAB='absen_sekolah';
 
 async function selectRekapKegiatan(id){
   selectedRekapKegiatan=id;
+  if(id===ABSEN_MALAM_TAB){
+    $('rekapKamar').style.display='';$('rekapKelas').style.display='none';
+    $('rekapFilter').style.display='none';$('rekapFilterLabel').textContent='';
+    loadRekap();return;
+  }
+  if(id===ABSEN_SEKOLAH_TAB){
+    $('rekapKamar').style.display='none';$('rekapKelas').style.display='';
+    $('rekapFilter').style.display='none';$('rekapFilterLabel').textContent='';
+    // Populate kelas dropdown
+    const santri=await api('/api/santri')||[];
+    const savedVal=$('rekapKelas').value;
+    $('rekapKelas').innerHTML='<option value="">Semua Kelas</option>';
+    const kelasSet=new Set(santri.map(s=>s.kelas_sekolah).filter(Boolean));
+    [...kelasSet].sort().forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent='Kelas '+k;if(k===savedVal)o.selected=true;$('rekapKelas').appendChild(o)});
+    loadRekap();return;
+  }
+  $('rekapKamar').style.display='';$('rekapKelas').style.display='none';
   await buildRekapFilter();
   loadRekap();
 }
@@ -1454,21 +1517,10 @@ async function buildRekapFilter(){
   const kegiatanList=await api('/api/kegiatan');
   const keg=kegiatanList?.find(k=>k.id==selectedRekapKegiatan);
   if(!keg){sel.style.display='none';lbl.textContent='';return}
-  let filter=getFilterForKegiatan(keg.nama);
+  const filter=getFilterForKegiatan(keg.nama);
+  if(!filter){sel.style.display='none';lbl.textContent='';return}
   const santri=await api('/api/santri')||[];
-  // If no standard filter, check extra fields
-  if(!filter){
-    const extraVals=[...new Set(santri.filter(s=>s.extra&&s.extra[keg.nama]).map(s=>s.extra[keg.nama]))].sort();
-    if(extraVals.length>0){
-      filter={field:'extra.'+keg.nama,label:keg.nama,isExtra:true,key:keg.nama};
-    }else{sel.style.display='none';lbl.textContent='';return}
-  }
-  let vals;
-  if(filter.isExtra){
-    vals=[...new Set(santri.filter(s=>s.extra&&s.extra[filter.key]).map(s=>s.extra[filter.key]))].sort();
-  }else{
-    vals=[...new Set(santri.map(s=>s[filter.field]).filter(Boolean))].sort();
-  }
+  const vals=[...new Set(santri.map(s=>s[filter.field]).filter(Boolean))].sort();
   if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
   vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
   sel.style.display='';
@@ -1480,7 +1532,7 @@ async function loadRekap(){
     const kegiatanList=await api('/api/kegiatan');
     if(kegiatanList&&kegiatanList.length){
       if(!selectedRekapKegiatan)selectedRekapKegiatan=kegiatanList[0].id;
-      $('rekapTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedRekapKegiatan?'active':'')+'" onclick="selectRekapKegiatan('+k.id+')">'+k.nama+'</div>').join('');
+      $('rekapTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedRekapKegiatan?'active':'')+'" onclick="selectRekapKegiatan('+k.id+')">'+k.nama+'</div>').join('')+'<div class="kegiatan-tab '+(selectedRekapKegiatan===ABSEN_MALAM_TAB?'active':'')+'" onclick="selectRekapKegiatan(ABSEN_MALAM_TAB)">🌙 Absen Malam</div>'+'<div class="kegiatan-tab '+(selectedRekapKegiatan===ABSEN_SEKOLAH_TAB?'active':'')+'" onclick="selectRekapKegiatan(ABSEN_SEKOLAH_TAB)">🏫 Absen Sekolah</div>';
       await buildRekapFilter();
     }
   }
@@ -1493,28 +1545,23 @@ async function loadRekap(){
   if($('rekapDari').value)params.set('dari',$('rekapDari').value);
   if($('rekapSampai').value)params.set('sampai',$('rekapSampai').value);
   if($('rekapKamar').value)params.set('kamar_id',$('rekapKamar').value);
-  if(selectedRekapKegiatan)params.set('kegiatan_id',selectedRekapKegiatan);
-  // Dynamic kelompok filter
-  const filterVal=$('rekapFilter').value;
-  if(filterVal&&selectedRekapKegiatan){
-    const kegiatanList=await api('/api/kegiatan');
-    const keg=kegiatanList?.find(k=>k.id==selectedRekapKegiatan);
-    if(keg){
-      let filter=getFilterForKegiatan(keg.nama);
-      if(!filter){
-        // Check extra
-        const santri=await api('/api/santri')||[];
-        if(santri.some(s=>s.extra&&s.extra[keg.nama])){
-          filter={isExtra:true,key:keg.nama};
-        }
-      }
-      if(filter){
-        if(filter.isExtra){
-          params.set('extra_key',filter.key);
-          params.set('extra_val',filterVal);
-        }else{
-          params.set(filter.field,filterVal);
-        }
+  if(selectedRekapKegiatan===ABSEN_MALAM_TAB){
+    params.set('tipe','absen_malam');
+    const filterVal=$('rekapFilter').value;
+    if(filterVal)params.set('kelompok_ngaji_malam',filterVal);
+  }else if(selectedRekapKegiatan===ABSEN_SEKOLAH_TAB){
+    params.set('tipe','absen_sekolah');
+    if($('rekapKelas').value)params.set('kelas_sekolah',$('rekapKelas').value);
+  }else{
+    if(selectedRekapKegiatan)params.set('kegiatan_id',selectedRekapKegiatan);
+    // Dynamic kelompok filter
+    const filterVal=$('rekapFilter').value;
+    if(filterVal&&selectedRekapKegiatan){
+      const kegiatanList=await api('/api/kegiatan');
+      const keg=kegiatanList?.find(k=>k.id==selectedRekapKegiatan);
+      if(keg){
+        const filter=getFilterForKegiatan(keg.nama);
+        if(filter)params.set(filter.field,filterVal);
       }
     }
   }
@@ -1564,10 +1611,25 @@ async function loadPengumuman(){
 }
 
 // Modals
-function showModal(type,editData){
+async function showModal(type,editData){
   let html='';
   if(type==='santri'){
-    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div><div class="form-group"><label>Kelas Diniyyah</label><input id="mKelasDiniyyah" value="'+(editData?.kelas_diniyyah||'')+'" placeholder="Contoh: 1A, 2B, 3A"></div><div class="form-group"><label>Kelompok Ngaji</label><input id="mKelompokNgaji" value="'+(editData?.kelompok_ngaji||'')+'" placeholder="Contoh: Juz 1, Tahsin"></div><div class="form-group"><label>Kelas Sekolah Formal</label><input id="mKelasSekolah" value="'+(editData?.kelas_sekolah||'')+'" placeholder="Contoh: 7A, 8B, 9A"></div><div class="form-group"><label>Jenis Bakat</label><input id="mJenisBakat" value="'+(editData?.jenis_bakat||'')+'" placeholder="Contoh: Tahfidz, Kaligrafi"></div><div class="form-group"><label>Kelompok Ngaji Malam</label><input id="mKelompokNgajiMalam" value="'+(editData?.kelompok_ngaji_malam||'')+'" placeholder="Contoh: Ust. Ahmad, Ust. Hasan"></div><div class="form-group"><label>Wali Santri</label><select id="mWali"><option value="">-- Tidak Ada --</option></select></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
+    // Field kegiatan dinamis berdasarkan kegiatan yang ada
+    const kegiatanList=await api('/api/kegiatan')||[];
+    let kegiatanFields='';
+    const usedFields=new Set();
+    kegiatanList.forEach(k=>{
+      const rule=filterRules.find(r=>k.nama.toLowerCase().includes(r.match));
+      if(rule&&!usedFields.has(rule.field)){
+        usedFields.add(rule.field);
+        kegiatanFields+='<div class="form-group"><label>'+rule.label+'</label><input id="m'+rule.field.charAt(0).toUpperCase()+rule.field.slice(1)+'" value="'+(editData?.[rule.field]||'')+'" placeholder="Isi '+rule.label+'"></div>';
+      }else{
+        // Kegiatan baru atau field sudah dipakai — pakai extra JSON
+        const extraVal=editData?.extra?.[k.id]||'';
+        kegiatanFields+='<div class="form-group"><label>'+k.nama+'</label><input id="mExtra_'+k.id+'" value="'+extraVal+'" placeholder="Isi '+k.nama+'"></div>';
+      }
+    });
+    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div>'+kegiatanFields+'<div class="form-group"><label>Wali Santri</label><select id="mWali"><option value="">-- Tidak Ada --</option></select></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
     api('/api/kamar').then(data=>{if(data)data.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;if(editData?.kamar_id===k.id)o.selected=true;$('mKamar').appendChild(o)})});
     api('/api/users').then(data=>{if(data)data.filter(u=>u.role==='wali').forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.nama;if(editData?.wali_user_id===u.id)o.selected=true;$('mWali').appendChild(o)})});
@@ -1603,7 +1665,23 @@ function showModal(type,editData){
 function closeModal(){$('modalBg').classList.remove('active')}
 
 async function saveSantri(id){
-  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,kelas_diniyyah:$('mKelasDiniyyah').value,kelompok_ngaji:$('mKelompokNgaji').value,kelas_sekolah:$('mKelasSekolah').value,jenis_bakat:$('mJenisBakat').value,kelompok_ngaji_malam:$('mKelompokNgajiMalam').value,wali_user_id:$('mWali').value||null};
+  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,wali_user_id:$('mWali').value||null};
+  // Ambil value dari field kegiatan dinamis
+  const allFields=['kelas_diniyyah','kelompok_ngaji','kelas_sekolah','jenis_bakat','kelompok_ngaji_malam'];
+  allFields.forEach(f=>{const el=$('m'+f.charAt(0).toUpperCase()+f.slice(1));body[f]=el?el.value:''});
+  // Ambil extra fields (kegiatan baru ATAU field sudah dipakai)
+  const kegiatanList=await api('/api/kegiatan')||[];
+  const usedFields2=new Set();
+  const extra={};
+  kegiatanList.forEach(k=>{
+    const rule=filterRules.find(r=>k.nama.toLowerCase().includes(r.match));
+    if(rule&&!usedFields2.has(rule.field)){
+      usedFields2.add(rule.field);
+    }else{
+      const el=$('mExtra_'+k.id);if(el&&el.value)extra[k.id]=el.value;
+    }
+  });
+  body.extra=extra;
   if(!body.nama)return toast('Nama wajib diisi');
   const res=await api('/api/santri'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
   toast(res.message||'Tersimpan');closeModal();loadSantri();
@@ -1755,6 +1833,22 @@ function exportPDF(){
 }
 
 // Settings
+async function cleanupOrphanAbsensi(){
+  const btn=$('btnCleanup');
+  if(!confirm('Yakin ingin bersihkan data absensi orphan?\n\nData absensi yang kegiatan-nya sudah dihapus akan dihapus permanen.\n(Termasuk data "Lainnya" di raport)'))return;
+  try{
+    btn.disabled=true;btn.textContent='⏳ Membersihkan...';
+    const res=await api('/api/maintenance/cleanup-absensi','POST');
+    if(res){
+      toast(res.message||'Berhasil dibersihkan');
+      btn.textContent='✅ '+res.removed+' data dihapus';
+      setTimeout(()=>{btn.textContent='🧹 Bersihkan Data Orphan';btn.disabled=false},3000);
+    }
+  }catch(e){
+    toast('Error: '+(e.message||'Gagal'));
+    btn.disabled=false;btn.textContent='🧹 Bersihkan Data Orphan';
+  }
+}
 async function loadPengaturan(){
   const s=await api('/api/settings');
   if(s)$('settingAppName').value=s.app_name||'';
@@ -1856,23 +1950,6 @@ async function saveSettings(){
     console.error('saveSettings error:',e);
   }finally{
     if(btn){btn.disabled=false;btn.textContent='Simpan Pengaturan'}
-  }
-}
-
-async function cleanupOrphanAbsensi(){
-  const btn=$('btnCleanup');
-  if(!confirm('Yakin ingin bersihkan data absensi orphan?\n\nData absensi yang kegiatan-nya sudah dihapus akan dihapus permanen.\n(Termasuk data "Lainnya" di raport)'))return;
-  try{
-    btn.disabled=true;btn.textContent='⏳ Membersihkan...';
-    const res=await api('/api/maintenance/cleanup-absensi','POST');
-    if(res){
-      toast(res.message||'Berhasil dibersihkan');
-      btn.textContent='✅ '+res.removed+' data dihapus';
-      setTimeout(()=>{btn.textContent='🧹 Bersihkan Data Orphan';btn.disabled=false},3000);
-    }
-  }catch(e){
-    toast('Error: '+(e.message||'Gagal'));
-    btn.disabled=false;btn.textContent='🧹 Bersihkan Data Orphan';
   }
 }
 

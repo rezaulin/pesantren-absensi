@@ -218,13 +218,14 @@ app.get('/api/santri', authenticate, (req, res) => {
   }));
 });
 app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
-  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah, kelompok_ngaji_malam, wali_user_id, extra } = req.body;
+  const { nama, kamar_id, status, kelas_diniyyah, kelompok_ngaji, jenis_bakat, kelas_sekolah, kelompok_ngaji_malam, wali_user_id, extra, alamat } = req.body;
   if (!nama || !kamar_id) return res.status(400).json({ message: 'Nama & kamar wajib' });
   const s = {
     id: nextId(db.santri), nama, kamar_id: parseInt(kamar_id), status: status || 'aktif',
     kelas_diniyyah: kelas_diniyyah || '', kelompok_ngaji: kelompok_ngaji || '',
     jenis_bakat: jenis_bakat || '', kelas_sekolah: kelas_sekolah || '',
     kelompok_ngaji_malam: kelompok_ngaji_malam || '',
+    alamat: alamat || '',
     extra: extra || {},
     wali_user_id: wali_user_id ? parseInt(wali_user_id) : null,
     extra: req.body.extra || {},
@@ -235,7 +236,7 @@ app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
 app.put('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
   const s = db.santri.find(x => x.id == req.params.id);
   if (!s) return res.status(404).json({ message: 'Santri tidak ditemukan' });
-  const fields = ['nama', 'status', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah', 'kelompok_ngaji_malam'];
+  const fields = ['nama', 'status', 'kelas_diniyyah', 'kelompok_ngaji', 'jenis_bakat', 'kelas_sekolah', 'kelompok_ngaji_malam', 'alamat'];
   fields.forEach(f => { if (req.body[f] !== undefined) s[f] = req.body[f]; });
   if (req.body.kamar_id) s.kamar_id = parseInt(req.body.kamar_id);
   if (req.body.wali_user_id !== undefined) s.wali_user_id = req.body.wali_user_id ? parseInt(req.body.wali_user_id) : null;
@@ -609,21 +610,15 @@ app.get('/api/raport/:santri_id', authenticate, (req, res) => {
   });
 });
 
-// ── Export Raport PDF ───────────────────────────────────
+// ── Export Raport PDF (4-Zone Layout) ───────────────────
 app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
   const santri = db.santri.find(s => s.id == req.params.santri_id);
   if (!santri) return res.status(404).json({ message: 'Santri tidak ditemukan' });
   const kamar = db.kamar.find(k => k.id === santri.kamar_id);
+  // Absensi rekap
   let absensiList = db.absensi.filter(a => a.santri_id === santri.id);
   if (req.query.dari) absensiList = absensiList.filter(a => a.tanggal >= req.query.dari);
   if (req.query.sampai) absensiList = absensiList.filter(a => a.tanggal <= req.query.sampai);
-  let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
-  if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
-  if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
-  let catatanList = (db.catatan_guru || []).filter(c => c.santri_id === santri.id);
-  if (req.query.dari) catatanList = catatanList.filter(c => c.tanggal >= req.query.dari);
-  if (req.query.sampai) catatanList = catatanList.filter(c => c.tanggal <= req.query.sampai);
-  // Group by kegiatan
   const rekap = {};
   absensiList.forEach(a => {
     const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
@@ -631,78 +626,158 @@ app.get('/api/raport/:santri_id/pdf', authenticate, (req, res) => {
     if (!rekap[nama]) rekap[nama] = { H: 0, I: 0, S: 0, A: 0 };
     rekap[nama][a.status]++;
   });
-  const statusMap = { H: 'Hadir', I: 'Izin', S: 'Sakit', A: 'Alfa' };
-  const doc = new PDFDocument({ size: 'A4', margin: 40 });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'attachment; filename=raport-' + santri.nama.replace(/\s+/g, '-') + '.pdf');
-  doc.pipe(res);
-  // Header
-  const data_settings = loadDB();
-  const appName = (data_settings.settings && data_settings.settings.app_name) || 'Pesantren';
-  doc.fontSize(18).font('Helvetica-Bold').text('RAPORT SANTRI', { align: 'center' });
-  doc.fontSize(11).font('Helvetica').text(appName, { align: 'center' });
-  doc.moveDown(1);
-  // Info santri
-  doc.fontSize(10).font('Helvetica-Bold').text('Nama: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.nama);
-  doc.font('Helvetica-Bold').text('Kamar: ', 40, doc.y, { continued: true }).font('Helvetica').text(kamar ? kamar.nama : '-');
-  doc.font('Helvetica-Bold').text('Kelas Diniyyah: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.kelas_diniyyah || '-');
-  doc.font('Helvetica-Bold').text('Kelompok Ngaji: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.kelompok_ngaji || '-');
-  doc.font('Helvetica-Bold').text('Kelas Sekolah: ', 40, doc.y, { continued: true }).font('Helvetica').text(santri.kelas_sekolah || '-');
-  doc.font('Helvetica-Bold').text('Periode: ', 40, doc.y, { continued: true }).font('Helvetica').text((req.query.dari || '-') + ' s/d ' + (req.query.sampai || '-'));
-  doc.moveDown(1);
-  // Tabel rekap kegiatan
-  doc.fontSize(12).font('Helvetica-Bold').text('Rekap Kehadiran', 40);
-  doc.moveDown(0.5);
-  const colW = [130, 60, 60, 60, 60];
-  const headers = ['Kegiatan', 'Hadir', 'Izin', 'Sakit', 'Alfa'];
-  let y = doc.y;
-  doc.fontSize(9).font('Helvetica-Bold');
-  let x = 40;
-  headers.forEach((h, i) => { doc.text(h, x, y, { width: colW[i] }); x += colW[i]; });
-  doc.moveTo(40, y + 14).lineTo(410, y + 14).stroke();
-  y += 18;
-  doc.font('Helvetica').fontSize(9);
-  Object.entries(rekap).forEach(([keg, r]) => {
-    x = 40;
-    [keg, r.H, r.I, r.S, r.A].forEach((cell, i) => { doc.text(String(cell), x, y, { width: colW[i] }); x += colW[i]; });
-    y += 16;
-  });
-  // Total
+  // Absen Malam
+  let absenMalamList = (db.absen_malam || []).filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absenMalamList = absenMalamList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absenMalamList = absenMalamList.filter(a => a.tanggal <= req.query.sampai);
+  if (absenMalamList.length) {
+    rekap['Absen Malam'] = { H: 0, I: 0, S: 0, A: 0 };
+    absenMalamList.forEach(a => rekap['Absen Malam'][a.status]++);
+  }
+  // Absen Sekolah
+  let absenSekolahList = (db.absen_sekolah || []).filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absenSekolahList = absenSekolahList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absenSekolahList = absenSekolahList.filter(a => a.tanggal <= req.query.sampai);
+  if (absenSekolahList.length) {
+    rekap['Sekolah Formal'] = { H: 0, I: 0, S: 0, A: 0 };
+    absenSekolahList.forEach(a => rekap['Sekolah Formal'][a.status]++);
+  }
+  // Pelanggaran & Catatan
+  let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
+  if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
+  if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
+  let catatanList = (db.catatan_guru || []).filter(c => c.santri_id === santri.id);
+  if (req.query.dari) catatanList = catatanList.filter(c => c.tanggal >= req.query.dari);
+  if (req.query.sampai) catatanList = catatanList.filter(c => c.tanggal <= req.query.sampai);
+  // Wali & Settings
+  const wali = santri.wali_user_id ? db.users.find(u => u.id === santri.wali_user_id) : null;
+  const dataSettings = loadDB();
+  const appName = (dataSettings.settings && dataSettings.settings.app_name) || 'Pesantren';
+  const kepalaNama = (dataSettings.settings && dataSettings.settings.kepala_nama) || '';
+  // Periode label
+  const bulanNama = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const sampaiDate = req.query.sampai ? new Date(req.query.sampai) : new Date();
+  const periodeLabel = bulanNama[sampaiDate.getMonth() + 1] + ' ' + sampaiDate.getFullYear();
+  // Totals
   const totalH = Object.values(rekap).reduce((s, r) => s + r.H, 0);
   const totalI = Object.values(rekap).reduce((s, r) => s + r.I, 0);
   const totalS = Object.values(rekap).reduce((s, r) => s + r.S, 0);
   const totalA = Object.values(rekap).reduce((s, r) => s + r.A, 0);
+  const totalAll = totalH + totalI + totalS + totalA;
+  // Build PDF
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename=raport-' + santri.nama.replace(/\s+/g, '-') + '.pdf');
+  doc.pipe(res);
+  const L = 40, R = 555, W = R - L;
+  let yy = 40;
+  // ── ZONA 1: KOP SURAT ──
+  doc.fontSize(16).font('Helvetica-Bold').text('LAPORAN BULANAN PERKEMBANGAN SANTRI', L, yy, { width: W, align: 'center' });
+  yy += 20;
+  doc.fontSize(11).font('Helvetica').text(appName, L, yy, { width: W, align: 'center' });
+  yy += 16;
+  doc.moveTo(L, yy + 4).lineTo(R, yy + 4).lineWidth(1.5).stroke();
+  doc.moveTo(L, yy + 7).lineTo(R, yy + 7).lineWidth(0.5).stroke();
+  yy += 16;
+  // ── ZONA 2: IDENTITAS ──
+  doc.fontSize(9).font('Helvetica');
+  const lblW = 110, valW = 160, col2X = 320;
+  // Left column
+  doc.font('Helvetica-Bold').text('Nama Santri', L, yy, { width: lblW, continued: true }).font('Helvetica').text(': ' + santri.nama);
+  yy += 14;
+  doc.font('Helvetica-Bold').text('Asrama / Kamar', L, yy, { width: lblW, continued: true }).font('Helvetica').text(': ' + (kamar ? kamar.nama : '-'));
+  yy += 14;
+  doc.font('Helvetica-Bold').text('Alamat', L, yy, { width: lblW, continued: true }).font('Helvetica').text(': ' + (santri.alamat || '-'), { width: valW });
+  // Right column
+  let yy2 = yy - 28;
+  doc.font('Helvetica-Bold').text('Kelas Diniyyah', col2X, yy2, { width: lblW, continued: true }).font('Helvetica').text(': ' + (santri.kelas_diniyyah || '-'));
+  yy2 += 14;
+  doc.font('Helvetica-Bold').text('Orang Tua / Wali', col2X, yy2, { width: lblW, continued: true }).font('Helvetica').text(': ' + (wali ? wali.nama : '-'));
+  yy2 += 14;
+  doc.font('Helvetica-Bold').text('Periode', col2X, yy2, { width: lblW, continued: true }).font('Helvetica').text(': ' + periodeLabel);
+  yy = Math.max(yy + 14, yy2 + 14) + 8;
+  doc.moveTo(L, yy).lineTo(R, yy).lineWidth(0.5).stroke();
+  yy += 10;
+  // ── ZONA 3A: REKAP ABSENSI ──
+  doc.fontSize(11).font('Helvetica-Bold').text('A. Rekap Absensi', L, yy);
+  yy += 16;
+  const colW2 = [140, 55, 55, 55, 55, 55];
+  const headers2 = ['Kegiatan', 'Hadir', 'Izin', 'Sakit', 'Alpa', 'Total'];
+  doc.fontSize(8).font('Helvetica-Bold');
+  let xx = L;
+  headers2.forEach((h, i) => { doc.text(h, xx, yy, { width: colW2[i], align: i > 0 ? 'center' : 'left' }); xx += colW2[i]; });
+  yy += 14;
+  doc.moveTo(L, yy - 2).lineTo(L + colW2.reduce((a, b) => a + b, 0), yy - 2).lineWidth(0.5).stroke();
+  doc.font('Helvetica').fontSize(8);
+  Object.entries(rekap).forEach(([keg, r]) => {
+    const t = r.H + r.I + r.S + r.A;
+    xx = L;
+    [keg, String(r.H), String(r.I), String(r.S), String(r.A), String(t)].forEach((cell, i) => {
+      doc.text(cell, xx, yy, { width: colW2[i], align: i > 0 ? 'center' : 'left' });
+      xx += colW2[i];
+    });
+    yy += 14;
+  });
+  // Total row
   doc.font('Helvetica-Bold');
-  x = 40;
-  ['TOTAL', totalH, totalI, totalS, totalA].forEach((cell, i) => { doc.text(String(cell), x, y, { width: colW[i] }); x += colW[i]; });
-  doc.moveDown(2);
-  // Pelanggaran
+  xx = L;
+  ['TOTAL', String(totalH), String(totalI), String(totalS), String(totalA), String(totalAll)].forEach((cell, i) => {
+    doc.text(cell, xx, yy, { width: colW2[i], align: i > 0 ? 'center' : 'left' });
+    xx += colW2[i];
+  });
+  yy += 20;
+  // ── ZONA 3B: KEDISIPLINAN ──
+  doc.fontSize(11).font('Helvetica-Bold').text('B. Catatan Kedisiplinan', L, yy);
+  yy += 16;
   if (pelanggaranList.length) {
-    doc.fontSize(12).font('Helvetica-Bold').text('Pelanggaran', 40);
-    doc.moveDown(0.5);
     doc.fontSize(8).font('Helvetica');
     pelanggaranList.forEach((p, i) => {
-      doc.text((i + 1) + '. [' + p.tanggal + '] ' + p.jenis + ' — ' + p.keterangan + (p.sanksi ? ' (Sanksi: ' + p.sanksi + ')' : ''), 40, doc.y, { width: 500 });
-      doc.moveDown(0.3);
+      if (yy > 720) { doc.addPage(); yy = 40; }
+      doc.font('Helvetica-Bold').text((i + 1) + '. [' + p.tanggal + '] ' + p.jenis, L, yy, { width: W });
+      yy += 12;
+      doc.font('Helvetica').text('   ' + (p.keterangan || '-') + (p.sanksi ? ' — Sanksi: ' + p.sanksi : ''), L, yy, { width: W });
+      yy += 14;
     });
   } else {
-    doc.fontSize(10).font('Helvetica').text('Tidak ada pelanggaran.', 40);
+    doc.fontSize(9).font('Helvetica').text('Alhamdulillah, tidak ada catatan pelanggaran bulan ini.', L, yy, { width: W });
+    yy += 14;
   }
-  doc.moveDown(1);
-  // Catatan Guru
-  doc.fontSize(12).font('Helvetica-Bold').text('Catatan Guru', 40);
-  doc.moveDown(0.5);
+  yy += 10;
+  // ── ZONA 3C: PERKEMBANGAN ──
+  doc.fontSize(11).font('Helvetica-Bold').text('C. Laporan Perkembangan', L, yy);
+  yy += 16;
   if (catatanList.length) {
-    doc.fontSize(8).font('Helvetica');
-    catatanList.forEach((c, i) => {
+    doc.fontSize(8);
+    catatanList.forEach((c) => {
+      if (yy > 700) { doc.addPage(); yy = 40; }
       const guru = db.users.find(u => u.id === c.created_by);
-      doc.font('Helvetica-Bold').text((i + 1) + '. [' + c.tanggal + '] ' + (c.judul || c.kategori) + ' — oleh ' + (guru ? guru.nama : '-'), 40, doc.y, { width: 500 });
-      doc.font('Helvetica').text(c.isi, 55, doc.y, { width: 485 });
-      doc.moveDown(0.4);
+      doc.font('Helvetica-Bold').text('[' + c.tanggal + '] ' + (c.judul || c.kategori) + ' — ' + (guru ? guru.nama : '-'), L, yy, { width: W });
+      yy += 12;
+      doc.font('Helvetica').text(c.isi, L + 10, yy, { width: W - 10 });
+      yy = doc.y + 8;
     });
   } else {
-    doc.fontSize(10).font('Helvetica').text('Tidak ada catatan.', 40);
+    doc.fontSize(9).font('Helvetica').text('Belum ada catatan perkembangan untuk periode ini.', L, yy, { width: W });
+    yy += 14;
   }
+  yy += 20;
+  // ── ZONA 4: PENGESAHAN ──
+  if (yy > 680) { doc.addPage(); yy = 40; }
+  const sigW = W / 3;
+  doc.fontSize(9).font('Helvetica');
+  // Labels
+  doc.text('Orang Tua / Wali', L, yy, { width: sigW, align: 'center' });
+  doc.text('Wali Kelas', L + sigW, yy, { width: sigW, align: 'center' });
+  doc.text('Kepala Yayasan', L + sigW * 2, yy, { width: sigW, align: 'center' });
+  yy += 50;
+  // Names under lines
+  doc.font('Helvetica-Bold');
+  doc.text(wali ? wali.nama : '-', L, yy, { width: sigW, align: 'center' });
+  doc.text('', L + sigW, yy, { width: sigW, align: 'center' }); // Wali Kelas: empty
+  doc.text(kepalaNama || '-', L + sigW * 2, yy, { width: sigW, align: 'center' });
+  // Print date
+  yy += 30;
+  doc.fontSize(8).font('Helvetica').text('Dicetak: ' + new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), L, yy, { width: W, align: 'right' });
   doc.end();
 });
 

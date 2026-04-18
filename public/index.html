@@ -580,6 +580,22 @@ tr:hover{background:var(--bg)}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--radius-full)}
 ::-webkit-scrollbar-thumb:hover{background:var(--text-light)}
+
+/* ── Print Styles (A4) ── */
+@media print{
+  @page{size:A4;margin:15mm}
+  body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body *{visibility:hidden}
+  #raportCanvas,#raportCanvas *{visibility:visible}
+  #raportCanvas{position:absolute;left:0;top:0;width:100%;border-radius:0!important;box-shadow:none!important}
+  #raportActions,.sidebar,.bottom-nav,.header-bar,#modalBg{display:none!important}
+  #raportCanvas table{border-color:#333!important}
+  #raportCanvas table th,#raportCanvas table td{border-color:#333!important;color:#000!important}
+  #raportCanvas h4{color:#000!important}
+  #raportCanvas p,#raportCanvas div,#raportCanvas span{color:#000!important}
+  /* Anti-potong: tanda tangan tidak boleh terpisah */
+  #raportCanvas .sig-area{page-break-inside:avoid}
+}
 </style>
 </head>
 <body>
@@ -818,6 +834,10 @@ tr:hover{background:var(--bg)}
               <p style="font-size:.7rem;color:#999;margin-top:.3rem">PNG/JPG, maks 5MB</p>
             </div>
           </div>
+        </div>
+        <div class="form-group">
+          <label>Nama Kepala Yayasan</label>
+          <input id="settingKepalaNama" placeholder="Contoh: Drs. H. Ahmad Fauzi, M.Pd">
         </div>
         <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:.8rem">Simpan Pengaturan</button>
       </div>
@@ -1784,7 +1804,7 @@ async function showModal(type,editData){
         kegiatanFields+='<div class="form-group"><label>'+k.nama+'</label><input id="mExtra_'+k.id+'" value="'+extraVal+'" placeholder="Isi '+k.nama+'"></div>';
       }
     });
-    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div>'+kegiatanFields+'<div class="form-group"><label>Wali Santri</label><select id="mWali"><option value="">-- Tidak Ada --</option></select></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
+    html='<h3>'+(editData?'Edit':'Tambah')+' Santri</h3><div class="form-group"><label>Nama</label><input id="mNama" value="'+(editData?.nama||'')+'"></div><div class="form-group"><label>Kamar</label><select id="mKamar"></select></div>'+kegiatanFields+'<div class="form-group"><label>Alamat</label><textarea id="mAlamat" rows="2" placeholder="Alamat lengkap santri">'+(editData?.alamat||'')+'</textarea></div><div class="form-group"><label>Wali Santri</label><select id="mWali"><option value="">-- Tidak Ada --</option></select></div><div class="form-group"><label>Status</label><select id="mStatus"><option value="aktif" '+(editData?.status==='aktif'?'selected':'')+'>Aktif</option><option value="nonaktif" '+(editData?.status==='nonaktif'?'selected':'')+'>Nonaktif</option><option value="lulus" '+(editData?.status==='lulus'?'selected':'')+'>Lulus</option></select></div><button class="btn btn-primary" onclick="saveSantri('+(editData?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
     api('/api/kamar').then(data=>{if(data)data.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;if(editData?.kamar_id===k.id)o.selected=true;$('mKamar').appendChild(o)})});
     api('/api/users').then(data=>{if(data)data.filter(u=>u.role==='wali').forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.nama;if(editData?.wali_user_id===u.id)o.selected=true;$('mWali').appendChild(o)})});
@@ -1820,7 +1840,7 @@ async function showModal(type,editData){
 function closeModal(){$('modalBg').classList.remove('active')}
 
 async function saveSantri(id){
-  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,wali_user_id:$('mWali').value||null};
+  const body={nama:$('mNama').value,kamar_id:parseInt($('mKamar').value),status:$('mStatus').value,wali_user_id:$('mWali').value||null,alamat:$('mAlamat')?.value||''};
   // Ambil value dari field kegiatan dinamis
   const allFields=['kelas_diniyyah','kelompok_ngaji','kelas_sekolah','jenis_bakat','kelompok_ngaji_malam'];
   allFields.forEach(f=>{const el=$('m'+f.charAt(0).toUpperCase()+f.slice(1));body[f]=el?el.value:''});
@@ -1950,45 +1970,117 @@ async function loadRaport(){
   if(!sid)return toast('Pilih santri dulu');
   const dari=$('raportDari').value;
   const sampai=$('raportSampai').value;
-  const d=await api('/api/raport/'+sid+'?dari='+dari+'&sampai='+sampai);
+  const [d,settings,users]=await Promise.all([
+    api('/api/raport/'+sid+'?dari='+dari+'&sampai='+sampai),
+    api('/api/settings'),
+    api('/api/users')
+  ]);
   if(!d)return;
   const s=d.santri;
-  let html='<div style=\"background:#fff;padding:1.2rem;border-radius:14px;box-shadow:var(--shadow);margin-bottom:1rem\">';
-  html+='<h4 style=\"color:var(--green);margin-bottom:.5rem\">'+s.nama+'</h4>';
-  html+='<p style=\"font-size:.8rem;color:#666\">Kamar: '+(s.kamar_nama||'-')+' | Diniyyah: '+(s.kelas_diniyyah||'-')+' | Ngaji: '+(s.kelompok_ngaji||'-')+' | Sekolah: '+(s.kelas_sekolah||'-')+'</p>';
-  html+='<p style=\"font-size:.8rem;color:#888\">Periode: '+d.periode.dari+' s/d '+d.periode.sampai+'</p>';
+  const appName=(settings&&settings.app_name)||'Pesantren Absensi';
+  const logo=(settings&&settings.settings&&settings.settings.logo)||(settings&&settings.logo)||'';
+  const kepalaNama=(settings&&settings.settings&&settings.settings.kepala_nama)||(settings&&settings.kepala_nama)||'';
+  // Resolve wali name
+  let waliNama='-';
+  if(s.wali_user_id&&users){const w=users.find(u=>u.id===s.wali_user_id);if(w)waliNama=w.nama;}
+  // Periode label
+  const bulanNama=['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const sampaiDate=sampai?new Date(sampai):new Date();
+  const periodeLabel=bulanNama[sampaiDate.getMonth()+1]+' '+sampaiDate.getFullYear();
+  // Hitung total
+  let totalH=0,totalI=0,totalS=0,totalA=0;
+  Object.values(d.rekap).forEach(r=>{totalH+=r.H;totalI+=r.I;totalS+=r.S;totalA+=r.A;});
+  const totalAll=totalH+totalI+totalS+totalA;
+  // === RAPORT CONTAINER ===
+  let html='<div id="raportCanvas" style="background:#fff;border-radius:14px;box-shadow:var(--shadow);margin-bottom:1rem;overflow:hidden">';
+  // ── ZONA 1: KOP SURAT ──
+  html+='<div style="padding:1.2rem 1.5rem;border-bottom:3px double #333;display:flex;align-items:center;gap:1rem">';
+  if(logo) html+='<img src="'+logo+'" style="width:65px;height:65px;object-fit:contain;border-radius:8px">';
+  else html+='<div style="width:65px;height:65px;background:var(--bg-alt);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2rem">🕌</div>';
+  html+='<div style="flex:1;text-align:center">';
+  html+='<h2 style="margin:0;font-size:1.1rem;letter-spacing:.5px">LAPORAN BULANAN PERKEMBANGAN SANTRI</h2>';
+  html+='<p style="margin:.2rem 0 0;font-size:.85rem;font-weight:600">'+appName+'</p>';
   html+='</div>';
-  // Rekap table
-  html+='<div class=\"section-title\">Rekap Kehadiran</div>';
-  html+='<div class=\"table-wrap\"><table><thead><tr><th>Kegiatan</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alfa</th><th>Total</th></tr></thead><tbody>';
+  html+='<div style="width:65px"></div>';
+  html+='</div>';
+  // ── ZONA 2: IDENTITAS & PERIODE ──
+  html+='<div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem .8rem;font-size:.85rem;border-bottom:1px solid #e5e5e5">';
+  html+='<div><strong>Nama Santri</strong></div><div>: '+s.nama+'</div>';
+  html+='<div><strong>Asrama / Kamar</strong></div><div>: '+(s.kamar_nama||'-')+'</div>';
+  html+='<div><strong>Alamat</strong></div><div>: '+(s.alamat||'-')+'</div>';
+  html+='<div><strong>Kelas Diniyyah</strong></div><div>: '+(s.kelas_diniyyah||'-')+'</div>';
+  html+='<div><strong>Orang Tua / Wali</strong></div><div>: '+waliNama+'</div>';
+  html+='<div><strong>Periode</strong></div><div>: '+periodeLabel+'</div>';
+  html+='</div>';
+  // ── ZONA 3: INTI LAPORAN ──
+  html+='<div style="padding:1rem 1.5rem">';
+  // Blok A: Rekap Absensi
+  html+='<div style="margin-bottom:1.2rem">';
+  html+='<h4 style="margin:0 0 .6rem;font-size:.9rem;border-bottom:2px solid var(--green);padding-bottom:.3rem;display:inline-block">A. Rekap Absensi</h4>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.3rem">';
+  html+='<thead><tr style="background:#f8f9fa"><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Kegiatan</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:55px">Hadir</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:50px">Izin</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:50px">Sakit</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:50px">Alpa</th><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:55px">Total</th></tr></thead>';
+  html+='<tbody>';
   if(Object.keys(d.rekap).length){
     Object.entries(d.rekap).forEach(([keg,r])=>{
-      const total=r.H+r.I+r.S+r.A;
-      html+='<tr><td>'+keg+'</td><td style="color:var(--green)">'+r.H+'</td><td style="color:#f9a825">'+r.I+'</td><td style="color:var(--blue)">'+r.S+'</td><td style="color:var(--red)">'+r.A+'</td><td><b>'+total+'</b></td></tr>';
+      const t=r.H+r.I+r.S+r.A;
+      html+='<tr><td style="padding:.45rem .5rem;border:1px solid #ddd">'+keg+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd;color:#16a34a;font-weight:600">'+r.H+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd">'+r.I+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd">'+r.S+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd;color:#dc2626">'+r.A+'</td><td style="padding:.45rem;text-align:center;border:1px solid #ddd;font-weight:600">'+t+'</td></tr>';
     });
   }else{
-    html+='<tr><td colspan=\"6\" style=\"text-align:center;padding:1rem\">Tidak ada data absensi</td></tr>';
+    html+='<tr><td colspan="6" style="padding:.8rem;text-align:center;color:#999;border:1px solid #ddd">Tidak ada data absensi</td></tr>';
   }
+  html+='<tr style="background:#f0fdf4;font-weight:700"><td style="padding:.5rem;border:1px solid #ddd">TOTAL</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd;color:#16a34a">'+totalH+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+totalI+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+totalS+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd;color:#dc2626">'+totalA+'</td><td style="padding:.5rem;text-align:center;border:1px solid #ddd">'+totalAll+'</td></tr>';
   html+='</tbody></table></div>';
-  // Pelanggaran
-  html+='<div class=\"section-title\">Pelanggaran</div>';
+  // Blok B: Kedisiplinan / Pelanggaran
+  html+='<div style="margin-bottom:1.2rem">';
+  html+='<h4 style="margin:0 0 .6rem;font-size:.9rem;border-bottom:2px solid #ef4444;padding-bottom:.3rem;display:inline-block">B. Catatan Kedisiplinan</h4>';
   if(d.pelanggaran.length){
-    html+='<div class=\"table-wrap\"><table><thead><tr><th>No</th><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Sanksi</th></tr></thead><tbody>';
-    d.pelanggaran.forEach((p,i)=>{html+='<tr><td>'+(i+1)+'</td><td>'+p.tanggal+'</td><td>'+p.jenis+'</td><td>'+(p.keterangan||'-')+'</td><td>'+(p.sanksi||'-')+'</td></tr>'});
-    html+='</tbody></table></div>';
+    html+='<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.3rem">';
+    html+='<thead><tr style="background:#f8f9fa"><th style="padding:.5rem;text-align:center;border:1px solid #ddd;width:30px">No</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd;width:85px">Tanggal</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Jenis</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Keterangan</th><th style="padding:.5rem;text-align:left;border:1px solid #ddd">Sanksi</th></tr></thead><tbody>';
+    d.pelanggaran.forEach((p,i)=>{
+      html+='<tr><td style="padding:.4rem .5rem;text-align:center;border:1px solid #ddd">'+(i+1)+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+p.tanggal+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+p.jenis+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+(p.keterangan||'-')+'</td><td style="padding:.4rem .5rem;border:1px solid #ddd">'+(p.sanksi||'-')+'</td></tr>';
+    });
+    html+='</tbody></table>';
   }else{
-    html+='<p style=\\\"color:#999;font-size:.85rem\\\">Tidak ada pelanggaran</p>';
+    html+='<p style="color:#16a34a;font-size:.85rem;padding:.5rem;background:#f0fdf4;border-radius:6px;margin:.3rem 0 0">✅ Alhamdulillah, tidak ada catatan pelanggaran bulan ini.</p>';
   }
-  // Catatan Guru
-  html+='<div class=\\\"section-title\\\">Catatan Guru</div>';
+  html+='</div>';
+  // Blok C: Laporan Perkembangan
+  html+='<div style="margin-bottom:1rem">';
+  html+='<h4 style="margin:0 0 .6rem;font-size:.9rem;border-bottom:2px solid #3b82f6;padding-bottom:.3rem;display:inline-block">C. Laporan Perkembangan</h4>';
   if(d.catatan_guru&&d.catatan_guru.length){
     d.catatan_guru.forEach(c=>{
-      html+='<div style=\\\"background:#f9f9f9;padding:.8rem;border-radius:8px;margin-bottom:.5rem\\\"><div style=\\\"font-size:.8rem;color:#888\\\">['+c.tanggal+'] '+(c.judul||c.kategori)+' — oleh '+c.guru_nama+'</div><p style=\\\"font-size:.85rem;margin:.3rem 0 0\\\">'+c.isi+'</p></div>';
+      html+='<div style="background:#f8fafc;padding:.7rem .8rem;border-radius:6px;margin-bottom:.4rem;border-left:3px solid #3b82f6">';
+      html+='<div style="font-size:.75rem;color:#888;margin-bottom:.2rem">['+c.tanggal+'] '+(c.judul||c.kategori)+' — '+c.guru_nama+'</div>';
+      html+='<p style="font-size:.83rem;margin:0;line-height:1.5">'+c.isi+'</p>';
+      html+='</div>';
     });
   }else{
-    html+='<p style=\\\"color:#999;font-size:.85rem\\\">Tidak ada catatan</p>';
+    html+='<div style="border:1px dashed #ddd;border-radius:6px;padding:1.5rem;min-height:80px;text-align:center;color:#bbb;font-size:.83rem">Belum ada catatan perkembangan untuk periode ini.</div>';
   }
+  html+='</div>';
+  html+='</div>'; // end zona 3
+  // ── ZONA 4: KOLOM PENGESAHAN ──
+  html+='<div style="padding:1rem 1.5rem 1.5rem;border-top:1px solid #e5e5e5;page-break-inside:avoid">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;text-align:center;font-size:.82rem">';
+  // Kiri: Orang Tua
+  html+='<div><p style="margin:0 0 3.5rem">Orang Tua / Wali</p><p style="margin:0;border-top:1px solid #333;padding-top:.3rem;font-weight:600">'+waliNama+'</p></div>';
+  // Tengah: Wali Kelas (kosong)
+  html+='<div><p style="margin:0 0 3.5rem">Wali Kelas</p><p style="margin:0;border-top:1px solid #333;padding-top:.3rem">&nbsp;</p></div>';
+  // Kanan: Kepala Yayasan
+  html+='<div><p style="margin:0 0 3.5rem">Kepala Yayasan</p><p style="margin:0;border-top:1px solid #333;padding-top:.3rem;font-weight:600">'+(kepalaNama||'-')+'</p></div>';
+  html+='</div>';
+  html+='<p style="text-align:right;font-size:.75rem;color:#888;margin:.8rem 0 0">Dicetak: '+new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+'</p>';
+  html+='</div>';
+  html+='</div>'; // end raportCanvas
+  // Print button
+  html+='<div id="raportActions" style="text-align:center;margin:.8rem 0">';
+  html+='<button class="btn btn-primary btn-sm" onclick="printRaport()" style="margin-right:.5rem">🖨️ Cetak Raport</button>';
+  html+='<button class="btn btn-outline btn-sm" onclick="exportRaportPDF()">📥 Export PDF</button>';
+  html+='</div>';
   $('raportContent').innerHTML=html;
+}
+function printRaport(){
+  window.print();
 }
 function exportRaportPDF(){
   const sid=$('raportSantri').value;
@@ -2035,6 +2127,7 @@ async function cleanupOrphanAbsensi(){
 async function loadPengaturan(){
   const s=await api('/api/settings');
   if(s)$('settingAppName').value=s.app_name||'';
+  if(s)$('settingKepalaNama').value=s.kepala_nama||'';
   if(s&&s.logo){$('logoPreview').innerHTML='<img src="'+s.logo+'" style="width:100%;height:100%;object-fit:cover">';$('logoPlaceholder').style.display='none'}
   if(s&&s.background){$('bgPreview').innerHTML='<img src="'+s.background+'" style="width:100%;height:100%;object-fit:cover">';$('bgPlaceholder').style.display='none'}
   if(s&&s.dashboard_bg){$('dashboardBgPreview').innerHTML='<img src="'+s.dashboard_bg+'" style="width:100%;height:100%;object-fit:cover">';$('dashboardBgPlaceholder').style.display='none'}
@@ -2105,7 +2198,7 @@ async function saveSettings(){
   const btn=document.querySelector('[onclick="saveSettings()"]');
   if(btn){btn.disabled=true;btn.textContent='Menyimpan...'}
   try{
-    await api('/api/settings',{method:'PUT',body:JSON.stringify({app_name:appName})});
+    await api('/api/settings',{method:'PUT',body:JSON.stringify({app_name:appName,kepala_nama:$('settingKepalaNama').value||''})});
     if(window._logoFile){
       toast('Upload logo...');
       const fd=new FormData();fd.append('file',window._logoFile);

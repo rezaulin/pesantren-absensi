@@ -573,6 +573,15 @@ app.post('/api/settings/background', authenticate, requireAdmin, (req, res) => {
   saveDB(data);
   res.json({ message: 'Background diupdate' });
 });
+app.post('/api/settings/dashboard-bg', authenticate, requireAdmin, (req, res) => {
+  const { dashboard_bg } = req.body;
+  if (!dashboard_bg) return res.status(400).json({ message: 'Background dashboard wajib' });
+  const data = loadDB();
+  if (!data.settings) data.settings = { app_name: 'Pesantren Absensi' };
+  data.settings.dashboard_bg = dashboard_bg;
+  saveDB(data);
+  res.json({ message: 'Background dashboard diupdate' });
+});
 
 // ── Export PDF ──────────────────────────────────────────
 app.get('/api/export/pdf', authenticate, (req, res) => {

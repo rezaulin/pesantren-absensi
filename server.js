@@ -226,6 +226,7 @@ app.post('/api/santri', authenticate, requireAdmin, (req, res) => {
     jenis_bakat: jenis_bakat || '', kelas_sekolah: kelas_sekolah || '',
     kelompok_ngaji_malam: kelompok_ngaji_malam || '',
     wali_user_id: wali_user_id ? parseInt(wali_user_id) : null,
+    extra: req.body.extra || {},
     created_at: new Date().toISOString()
   };
   db.santri.push(s); saveDB(db); res.json(s);
@@ -237,6 +238,7 @@ app.put('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
   fields.forEach(f => { if (req.body[f] !== undefined) s[f] = req.body[f]; });
   if (req.body.kamar_id) s.kamar_id = parseInt(req.body.kamar_id);
   if (req.body.wali_user_id !== undefined) s.wali_user_id = req.body.wali_user_id ? parseInt(req.body.wali_user_id) : null;
+  if (req.body.extra !== undefined) s.extra = req.body.extra;
   saveDB(db); res.json({ message: 'Santri diupdate' });
 });
 app.delete('/api/santri/:id', authenticate, requireAdmin, (req, res) => {
@@ -278,6 +280,11 @@ app.get('/api/absensi', authenticate, (req, res) => {
       list = list.filter(a => santriIds.includes(a.santri_id));
     }
   });
+  // Filter by extra field
+  if (req.query.extra_key && req.query.extra_val) {
+    const santriIds = db.santri.filter(s => s.extra && s.extra[req.query.extra_key] === req.query.extra_val).map(s => s.id);
+    list = list.filter(a => santriIds.includes(a.santri_id));
+  }
   res.json(list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);
     const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
@@ -312,6 +319,11 @@ app.get('/api/rekap', authenticate, (req, res) => {
       list = list.filter(a => santriIds.includes(a.santri_id));
     }
   });
+  // Filter by extra field
+  if (req.query.extra_key && req.query.extra_val) {
+    const santriIds = db.santri.filter(s => s.extra && s.extra[req.query.extra_key] === req.query.extra_val).map(s => s.id);
+    list = list.filter(a => santriIds.includes(a.santri_id));
+  }
   res.json(list.map(a => {
     const s = db.santri.find(x => x.id === a.santri_id);
     const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
@@ -701,6 +713,16 @@ app.get('/api/export/pdf', authenticate, (req, res) => {
   doc.font('Helvetica').text(`Hadir: ${hadir} | Izin: ${izin} | Sakit: ${sakit} | Alfa: ${alfa} | Total: ${data.length}`, 40);
 
   doc.end();
+});
+
+// ── Cleanup Orphan Absensi ─────────────────────────────
+app.post('/api/maintenance/cleanup-absensi', authenticate, requireAdmin, (req, res) => {
+  const validKegiatanIds = new Set(db.kegiatan.map(k => k.id));
+  const before = db.absensi.length;
+  db.absensi = db.absensi.filter(a => validKegiatanIds.has(a.kegiatan_id));
+  const removed = before - db.absensi.length;
+  saveDB(db);
+  res.json({ message: `Bersihkan ${removed} data absensi orphan`, removed, remaining: db.absensi.length });
 });
 
 app.listen(PORT, () => console.log(`Server jalan di http://localhost:${PORT}`));

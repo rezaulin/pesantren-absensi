@@ -1161,15 +1161,26 @@ function getFilterForKegiatan(nama){
   return null;
 }
 async function buildFilterDropdown(kegNama){
-  const filter=getFilterForKegiatan(kegNama);
+  let filter=getFilterForKegiatan(kegNama);
   const sel=$('absensiFilter');
   const lbl=$('absensiFilterLabel');
   sel.innerHTML='<option value="">Semua</option>';
-  if(!filter){sel.style.display='none';lbl.textContent='';return}
+  // If no standard filter, check extra fields
+  if(!filter){
+    allSantriCache=await api('/api/santri')||[];
+    const extraVals=[...new Set(allSantriCache.filter(s=>s.extra&&s.extra[kegNama]).map(s=>s.extra[kegNama]))].sort();
+    if(extraVals.length>0){
+      filter={field:'extra.'+kegNama,label:kegNama,isExtra:true,key:kegNama};
+    }else{sel.style.display='none';lbl.textContent='';return}
+  }
   sel.style.display='';
   // Always refresh santri cache for auto-sync
-  allSantriCache=await api('/api/santri')||[];
-  if(filter.field==='kamar_id'){
+  if(!allSantriCache.length)allSantriCache=await api('/api/santri')||[];
+  if(filter.isExtra){
+    const vals=[...new Set(allSantriCache.filter(s=>s.extra&&s.extra[filter.key]).map(s=>s.extra[filter.key]))].sort();
+    if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
+    vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
+  }else if(filter.field==='kamar_id'){
     const kamar=await api('/api/kamar');
     if(kamar)kamar.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=k.nama;sel.appendChild(o)});
   }else{
@@ -1189,13 +1200,23 @@ async function loadAbsensi(){
     if(!selectedKegiatan){selectedKegiatan=kegiatanList[0].id;await buildFilterDropdown(kegiatanList[0].nama)}
     $('kegiatanTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedKegiatan?'active':'')+'" onclick="selectKegiatan('+k.id+')">'+k.nama+'</div>').join('');
   }
-  const kegName=kegiatanList?kegiatanList.find(k=>k.id===selectedKegiatan)?.nama||'':'';
-  const filter=getFilterForKegiatan(kegName);
+  const kegName=kegiatanList?kegiatanList.find(k=>k.id===selectedKegiatan)?.nama||'';
+  let filter=getFilterForKegiatan(kegName);
+  // Check extra if no standard filter
+  if(!filter&&kegName){
+    if(!allSantriCache.length)allSantriCache=await api('/api/santri')||[];
+    const hasExtra=allSantriCache.some(s=>s.extra&&s.extra[kegName]);
+    if(hasExtra)filter={field:'extra.'+kegName,label:kegName,isExtra:true,key:kegName};
+  }
   let santriUrl='/api/santri';
   let absensiUrl='/api/absensi?tanggal='+tanggal+'&kegiatan_id='+selectedKegiatan;
   if(filterVal&&filter){
-    santriUrl+='?'+filter.field+'='+encodeURIComponent(filterVal);
-    absensiUrl+='&'+filter.field+'='+encodeURIComponent(filterVal);
+    if(filter.isExtra){
+      absensiUrl+='&extra_key='+encodeURIComponent(filter.key)+'&extra_val='+encodeURIComponent(filterVal);
+    }else{
+      santriUrl+='?'+filter.field+'='+encodeURIComponent(filterVal);
+      absensiUrl+='&'+filter.field+'='+encodeURIComponent(filterVal);
+    }
   }
   const [santri,existing]=await Promise.all([api(santriUrl),api(absensiUrl)]);
   if(!santri)return;
@@ -1206,7 +1227,7 @@ async function loadAbsensi(){
     const ex=existingMap[s.id];
     const st=ex?ex.status:'H';
     absensiData[s.id]=st;
-    const sub=filter?(s[filter.field]||'-'):(s.kamar_nama||'-');
+    const sub=filter?(filter.isExtra?(s.extra?.[filter.key]||'-'):(s[filter.field]||'-')):(s.kamar_nama||'-');
     return {id:s.id,nama:s.nama,sub,idx:i+1};
   });
   renderAbsensiGrid();
@@ -1428,10 +1449,21 @@ async function buildRekapFilter(){
   const kegiatanList=await api('/api/kegiatan');
   const keg=kegiatanList?.find(k=>k.id==selectedRekapKegiatan);
   if(!keg){sel.style.display='none';lbl.textContent='';return}
-  const filter=getFilterForKegiatan(keg.nama);
-  if(!filter){sel.style.display='none';lbl.textContent='';return}
+  let filter=getFilterForKegiatan(keg.nama);
   const santri=await api('/api/santri')||[];
-  const vals=[...new Set(santri.map(s=>s[filter.field]).filter(Boolean))].sort();
+  // If no standard filter, check extra fields
+  if(!filter){
+    const extraVals=[...new Set(santri.filter(s=>s.extra&&s.extra[keg.nama]).map(s=>s.extra[keg.nama]))].sort();
+    if(extraVals.length>0){
+      filter={field:'extra.'+keg.nama,label:keg.nama,isExtra:true,key:keg.nama};
+    }else{sel.style.display='none';lbl.textContent='';return}
+  }
+  let vals;
+  if(filter.isExtra){
+    vals=[...new Set(santri.filter(s=>s.extra&&s.extra[filter.key]).map(s=>s.extra[filter.key]))].sort();
+  }else{
+    vals=[...new Set(santri.map(s=>s[filter.field]).filter(Boolean))].sort();
+  }
   if(vals.length===0){sel.style.display='none';lbl.textContent=filter.label+' (belum ada data)';return}
   vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)});
   sel.style.display='';
@@ -1463,8 +1495,22 @@ async function loadRekap(){
     const kegiatanList=await api('/api/kegiatan');
     const keg=kegiatanList?.find(k=>k.id==selectedRekapKegiatan);
     if(keg){
-      const filter=getFilterForKegiatan(keg.nama);
-      if(filter)params.set(filter.field,filterVal);
+      let filter=getFilterForKegiatan(keg.nama);
+      if(!filter){
+        // Check extra
+        const santri=await api('/api/santri')||[];
+        if(santri.some(s=>s.extra&&s.extra[keg.nama])){
+          filter={isExtra:true,key:keg.nama};
+        }
+      }
+      if(filter){
+        if(filter.isExtra){
+          params.set('extra_key',filter.key);
+          params.set('extra_val',filterVal);
+        }else{
+          params.set(filter.field,filterVal);
+        }
+      }
     }
   }
   const data=await api('/api/rekap?'+params);

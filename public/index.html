@@ -1729,12 +1729,20 @@ async function loadAppSettings(){
       $('loginPage').style.backgroundPosition='center';
     }
     if(s&&s.dashboard_bg){
-      // Background welcome banner
-      const banner=$('welcomeBanner');
-      if(banner){
-        banner.style.background='url('+s.dashboard_bg+') center/cover no-repeat';
-        banner.style.position='relative';
+      // Background di grid menu (area icon menu)
+      const grid=$('gridMenu');
+      if(grid){
+        grid.style.background='url('+s.dashboard_bg+') center/cover no-repeat';
+        grid.style.borderRadius='var(--radius-lg)';
+        grid.style.position='relative';
+        grid.style.padding='0.7rem';
+        grid.style.marginTop='0.5rem';
       }
+      // Buat menu item sedikit transparan supaya background keliatan
+      document.querySelectorAll('.menu-item').forEach(item=>{
+        item.style.background='rgba(255,255,255,0.85)';
+        item.style.backdropFilter='blur(4px)';
+      });
     }
   }catch(e){}
 }

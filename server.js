@@ -582,6 +582,15 @@ app.post('/api/settings/dashboard-bg', authenticate, requireAdmin, (req, res) =>
   saveDB(data);
   res.json({ message: 'Background dashboard diupdate' });
 });
+app.post('/api/settings/delete', authenticate, requireAdmin, (req, res) => {
+  const { field } = req.body;
+  const allowed = ['logo', 'background', 'dashboard_bg'];
+  if (!allowed.includes(field)) return res.status(400).json({ message: 'Field tidak valid' });
+  const data = loadDB();
+  if (data.settings) delete data.settings[field];
+  saveDB(data);
+  res.json({ message: field + ' dihapus' });
+});
 
 // ── Export PDF ──────────────────────────────────────────
 app.get('/api/export/pdf', authenticate, (req, res) => {

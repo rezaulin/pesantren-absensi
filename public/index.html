@@ -1443,7 +1443,11 @@ async function loadRekap(){
     const kegiatanList=await api('/api/kegiatan');
     if(kegiatanList&&kegiatanList.length){
       if(!selectedRekapKegiatan)selectedRekapKegiatan=kegiatanList[0].id;
-      $('rekapTabs').innerHTML=kegiatanList.map(k=>'<div class="kegiatan-tab '+(k.id===selectedRekapKegiatan?'active':'')+'" onclick="selectRekapKegiatan('+k.id+')">'+k.nama+'</div>').join('');
+      $('rekapTabs').innerHTML=kegiatanList.map(k=>{
+        let label=k.nama;
+        if(label.toLowerCase().includes('malam'))label='Absen Malam';
+        return '<div class="kegiatan-tab '+(k.id===selectedRekapKegiatan?'active':'')+'" onclick="selectRekapKegiatan('+k.id+')">'+label+'</div>';
+      }).join('');
       await buildRekapFilter();
     }
   }
@@ -1651,8 +1655,10 @@ async function loadRaport(){
   html+='<div class=\"table-wrap\"><table><thead><tr><th>Kegiatan</th><th>Hadir</th><th>Izin</th><th>Sakit</th><th>Alfa</th><th>Total</th></tr></thead><tbody>';
   if(Object.keys(d.rekap).length){
     Object.entries(d.rekap).forEach(([keg,r])=>{
+      let label=keg;
+      if(label.toLowerCase().includes('malam'))label='Absen Malam';
       const total=r.H+r.I+r.S+r.A;
-      html+='<tr><td>'+keg+'</td><td style=\"color:var(--green)\">'+r.H+'</td><td style=\"color:#f9a825\">'+r.I+'</td><td style=\"color:var(--blue)\">'+r.S+'</td><td style=\"color:var(--red)\">'+r.A+'</td><td><b>'+total+'</b></td></tr>';
+      html+='<tr><td>'+label+'</td><td style="color:var(--green)">'+r.H+'</td><td style="color:#f9a825">'+r.I+'</td><td style="color:var(--blue)">'+r.S+'</td><td style="color:var(--red)">'+r.A+'</td><td><b>'+total+'</b></td></tr>';
     });
   }else{
     html+='<tr><td colspan=\"6\" style=\"text-align:center;padding:1rem\">Tidak ada data absensi</td></tr>';

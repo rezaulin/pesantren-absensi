@@ -430,8 +430,13 @@ app.get('/api/raport/:santri_id', authenticate, (req, res) => {
   let catatanList = (db.catatan_guru || []).filter(c => c.santri_id === santri.id);
   if (req.query.dari) catatanList = catatanList.filter(c => c.tanggal >= req.query.dari);
   if (req.query.sampai) catatanList = catatanList.filter(c => c.tanggal <= req.query.sampai);
-  // Group absensi by kegiatan
+  // Group absensi by kegiatan - show ALL kegiatan
   const rekap = {};
+  // Initialize all kegiatan with 0
+  db.kegiatan.forEach(k => {
+    rekap[k.nama] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+  });
+  // Fill in actual data
   absensiList.forEach(a => {
     const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
     const nama = kg ? kg.nama : 'Lainnya';

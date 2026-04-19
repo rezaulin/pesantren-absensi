@@ -120,13 +120,21 @@ app.get('/api/dashboard', authenticate, (req, res) => {
   // Admin/ustadz: dashboard biasa
   const hadir = db.absensi.filter(a => a.tanggal === today && a.status === 'H').length;
   const izin = db.absensi.filter(a => a.tanggal === today && (a.status === 'I' || a.status === 'S')).length;
-  const alfa = db.absensi.filter(a => a.tanggal === today && a.status === 'A').length;
+  const alfaAbsensi = db.absensi.filter(a => a.tanggal === today && a.status === 'A');
+  const alfa = alfaAbsensi.length;
+  const alfaList = alfaAbsensi.map(a => {
+    const s = db.santri.find(x => x.id === a.santri_id);
+    const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+    const kg = db.kegiatan.find(x => x.id === a.kegiatan_id);
+    return { nama: s ? s.nama : '-', kamar: k ? k.nama : '-', kegiatan: kg ? kg.nama : '-' };
+  });
   res.json({
     total_santri: db.santri.filter(s => s.status === 'aktif').length,
     total_kamar: db.kamar.length,
     hadir_hari_ini: hadir,
     izin_sakit: izin,
     alfa: alfa,
+    alfa_list: alfaList,
     pengumuman: db.pengumuman.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3)
   });
 });

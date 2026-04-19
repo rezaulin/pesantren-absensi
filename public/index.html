@@ -937,13 +937,10 @@ tr:hover{background:var(--bg)}
       </div>
       <div class="stats" id="statsContainer"></div>
 
-      <!-- Quick Actions - shortcut harian -->
-      <div class="quick-actions" id="quickActions"></div>
-
-      <!-- Menu Grid di Dashboard (semua menu kecuali Pengaturan) -->
+      <!-- Menu Grid di Dashboard -->
       <div id="dashboardMenuGrid"></div>
 
-      <!-- Dashboard Widgets (mobile: card feed, desktop: table) -->
+      <!-- Bagian Lainnya di Dashboard -->
       <div id="dashboardSantriProfile"></div>
       <div id="dashboardWidgets"></div>
     </div>
@@ -1269,9 +1266,6 @@ tr:hover{background:var(--bg)}
   <button class="nav-item" onclick="switchTab('rekap')" id="navtab-rekap">
     <span class="nav-icon">📋</span>Rekap
   </button>
-  <button class="nav-item" onclick="switchTab('menu')" id="navtab-menu">
-    <span class="nav-icon">📂</span>Menu
-  </button>
   <button class="nav-item" onclick="toggleSidebar()" id="navtab-more">
     <span class="nav-icon">☰</span>Lainnya
   </button>
@@ -1424,14 +1418,14 @@ function buildGridMenu(){
     ]},
   ];
   const groups=me.role==='admin'?adminGroups:me.role==='wali'?waliGroups:ustadzGroups;
-  // Quick action IDs — jangan tampil double di dashboard menu grid
-  const quickActionIds=['absensi','absenmalam','santri','pelanggaran'];
-  function renderGroups(container,excludePengaturan,excludeQuickActions){
+  // Items yang masuk section "Lainnya" di dashboard
+  const lainnyaIds=['pelanggaran','pengumuman','sensus','exportpdf'];
+  function renderGroups(container,excludePengaturan,excludeLainnya){
     let html='';
     groups.forEach(g=>{
       let items=g.items;
       if(excludePengaturan)items=items.filter(m=>m.id!=='pengaturan');
-      if(excludeQuickActions)items=items.filter(m=>!quickActionIds.includes(m.id));
+      if(excludeLainnya)items=items.filter(m=>!lainnyaIds.includes(m.id));
       if(!items.length)return;
       if(g.title)html+='<div class="menu-group-title">'+g.title+'</div>';
       html+='<div class="grid-menu">';
@@ -1447,6 +1441,25 @@ function buildGridMenu(){
   }
   renderGroups('fullMenu',false,false);
   renderGroups('dashboardMenuGrid',true,true);
+
+  // Section "Lainnya" di dashboard
+  const lainnyaItems=[
+    {id:'pelanggaran',icon:'⚠️',label:'Input Pelanggaran'},
+    {id:'pengumuman',icon:'📢',label:'Pengumuman'},
+    {id:'sensus',icon:'📊',label:'Sensus'},
+    {id:'exportpdf',icon:'📥',label:'Export PDF'},
+  ];
+  if(me.role!=='wali'){
+    let lHtml='<div class="menu-group-title">📌 Lainnya</div><div class="grid-menu">';
+    lainnyaItems.forEach(m=>{
+      lHtml+='<div class="menu-item" onclick="handleMenuClick(\''+m.id+'\')">';
+      lHtml+='<div class="menu-icon">'+m.icon+'</div>';
+      lHtml+='<div class="menu-label">'+m.label+'</div>';
+      lHtml+='</div>';
+    });
+    lHtml+='</div>';
+    $('dashboardMenuGrid').innerHTML+=lHtml;
+  }
 }
 
 function handleMenuClick(id){
@@ -1524,22 +1537,6 @@ async function loadDashboard(){
     '<div class="stat-card green"><span class="icon">✅</span><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
     '<div class="stat-card orange"><span class="icon">📝</span><div class="num">'+(d.izin_sakit||0)+'</div><div class="label">Izin/Sakit</div></div>'+
     '<div class="stat-card red"><span class="icon">❌</span><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
-
-  // Quick Actions - 4 shortcut harian
-  let qaHtml='';
-  const quickItems=[
-    {id:'absensi',icon:'✅',label:'Absen\nKelas'},
-    {id:'absenmalam',icon:'🌙',label:'Absen\nMalam'},
-    {id:'santri',icon:'👨‍🎓',label:'Data\nSantri'},
-    {id:'pelanggaran',icon:'⚠️',label:'Input\nPelanggaran'},
-  ];
-  quickItems.forEach(q=>{
-    qaHtml+='<div class="quick-action" onclick="switchTab(\''+q.id+'\')">';
-    qaHtml+='<div class="qa-icon">'+q.icon+'</div>';
-    qaHtml+='<div class="qa-label">'+q.label.replace('\n','<br>')+'</div>';
-    qaHtml+='</div>';
-  });
-  $('quickActions').innerHTML=qaHtml;
 
   // Dashboard widgets
   let wHtml='';

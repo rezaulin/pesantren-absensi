@@ -264,38 +264,49 @@ a{color:inherit;text-decoration:none}
    ============================ */
 .grid-menu{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:.7rem;padding:0 .1rem;
+  grid-template-columns:repeat(4,1fr);
+  gap:.6rem;padding:0 .1rem;
+  margin-bottom:.8rem;
 }
+.menu-group-title{
+  font-size:.72rem;font-weight:700;
+  color:rgba(255,255,255,.5);
+  text-transform:uppercase;
+  letter-spacing:.8px;
+  margin:1rem 0 .5rem;
+  padding-left:.2rem;
+}
+.menu-group-title:first-child{margin-top:0}
 .menu-item{
-  background:var(--secondary-light);
-  border-radius:var(--radius-lg);
-  padding:.9rem .4rem .7rem;
+  background:rgba(255,255,255,.07);
+  border-radius:16px;
+  padding:.8rem .3rem .65rem;
   text-align:center;
   cursor:pointer;
   transition:all .2s cubic-bezier(.4,0,.2,1);
-  display:flex;flex-direction:column;align-items:center;gap:.5rem;
+  display:flex;flex-direction:column;align-items:center;gap:.4rem;
   border:1px solid rgba(255,255,255,.06);
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+  backdrop-filter:blur(4px);
 }
 .menu-item:hover{
-  transform:translateY(-3px);
-  box-shadow:0 8px 24px rgba(15,23,42,.3);
-  background:var(--secondary);
+  transform:translateY(-4px);
+  box-shadow:0 8px 24px rgba(0,0,0,.3);
+  background:rgba(255,255,255,.12);
 }
-.menu-item:active{transform:scale(.96)}
+.menu-item:active{transform:scale(.95)}
 .menu-icon{
-  font-size:1.5rem;
-  width:50px;height:50px;
+  font-size:1.7rem;
+  width:48px;height:48px;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(13,148,136,.2);
-  border-radius:var(--radius);
+  background:rgba(13,148,136,.15);
+  border-radius:14px;
 }
 .menu-label{
-  font-size:.7rem;font-weight:600;color:rgba(255,255,255,.9);
-  line-height:1.25;
+  font-size:.65rem;font-weight:600;color:rgba(255,255,255,.88);
+  line-height:1.2;
 }
-.menu-item.highlight{background:linear-gradient(135deg,#1e293b,#2d1b0e)}
-.menu-item.highlight .menu-icon{background:rgba(249,115,22,.2)}
+
 
 /* ============================
    BOTTOM NAV (Modern)
@@ -578,7 +589,7 @@ tr:hover{background:var(--bg)}
    ============================ */
 @media(min-width:600px){
   .absensi-grid{grid-template-columns:1fr 1fr}
-  .grid-menu{grid-template-columns:repeat(6,1fr)}
+  .grid-menu{grid-template-columns:repeat(4,1fr)}
   .stats{grid-template-columns:repeat(4,1fr)}
 }
 
@@ -1097,43 +1108,74 @@ function renderNavList(items){
 }
 
 function buildGridMenu(){
-  const adminMenu=[
-    {id:'absensi',icon:'✅',label:'Absensi',highlight:false},
-    {id:'absenmalam',icon:'🌙',label:'Absen Malam',highlight:true},
-    {id:'absensekolah',icon:'🏫',label:'Absen Sekolah',highlight:true},
-    {id:'santri',icon:'👨‍🎓',label:'Data Santri',highlight:false},
-    {id:'kamar',icon:'🏠',label:'Kelola Kamar',highlight:false},
-    {id:'kegiatan',icon:'📚',label:'Kegiatan',highlight:false},
-    {id:'sensus',icon:'📊',label:'Sensus',highlight:false},
-    {id:'rekap',icon:'📋',label:'Rekap',highlight:false},
-    {id:'laporan',icon:'📈',label:'Laporan',highlight:false},
-    {id:'rekap-ustadz',icon:'👨‍🏫',label:'Rekap Ustadz',highlight:false},
-    {id:'users',icon:'👥',label:'Pengguna',highlight:false},
-    {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
-    {id:'pelanggaran',icon:'⚠️',label:'Pelanggaran',highlight:false},
-    {id:'catatan',icon:'📝',label:'Catatan Guru',highlight:false},
-    {id:'raport',icon:'📜',label:'Raport Santri',highlight:true},
-    {id:'pengaturan',icon:'⚙️',label:'Pengaturan',highlight:false},
-    {id:'exportpdf',icon:'📥',label:'Export PDF',highlight:true},
+  const adminGroups=[
+    {title:'📋 Operasional Harian',items:[
+      {id:'absensi',icon:'✅',label:'Absensi'},
+      {id:'absenmalam',icon:'🌙',label:'Absen Malam'},
+      {id:'absensekolah',icon:'🏫',label:'Absen Sekolah'},
+      {id:'pelanggaran',icon:'⚠️',label:'Pelanggaran'},
+      {id:'catatan',icon:'📝',label:'Catatan Guru'},
+    ]},
+    {title:'📁 Data Master',items:[
+      {id:'santri',icon:'👨‍🎓',label:'Data Santri'},
+      {id:'kamar',icon:'🏠',label:'Kelola Kamar'},
+      {id:'kegiatan',icon:'📚',label:'Kegiatan'},
+      {id:'users',icon:'👥',label:'Pengguna'},
+      {id:'sensus',icon:'📊',label:'Sensus'},
+    ]},
+    {title:'📊 Laporan & Rekap',items:[
+      {id:'rekap',icon:'📋',label:'Rekap Absensi'},
+      {id:'raport',icon:'📜',label:'Raport Santri'},
+      {id:'rekap-ustadz',icon:'👨‍🏫',label:'Rekap Ustadz'},
+      {id:'laporan',icon:'📈',label:'Laporan'},
+      {id:'exportpdf',icon:'📥',label:'Export PDF'},
+    ]},
+    {title:'',items:[
+      {id:'pengumuman',icon:'📢',label:'Pengumuman'},
+      {id:'pengaturan',icon:'⚙️',label:'Pengaturan'},
+    ]},
   ];
-  const ustadzMenu=[
-    {id:'absensi',icon:'✅',label:'Absensi',highlight:false},
-    {id:'absenmalam',icon:'🌙',label:'Absen Malam',highlight:true},
-    {id:'absensekolah',icon:'🏫',label:'Absen Sekolah',highlight:true},
-    {id:'santri',icon:'👨‍🎓',label:'Data Santri',highlight:false},
-    {id:'rekap',icon:'📋',label:'Rekap',highlight:false},
-    {id:'catatan',icon:'📝',label:'Catatan Guru',highlight:false},
-    {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
+  const ustadzGroups=[
+    {title:'📋 Operasional Harian',items:[
+      {id:'absensi',icon:'✅',label:'Absensi'},
+      {id:'absenmalam',icon:'🌙',label:'Absen Malam'},
+      {id:'absensekolah',icon:'🏫',label:'Absen Sekolah'},
+      {id:'pelanggaran',icon:'⚠️',label:'Pelanggaran'},
+      {id:'catatan',icon:'📝',label:'Catatan Guru'},
+    ]},
+    {title:'📊 Laporan & Rekap',items:[
+      {id:'rekap',icon:'📋',label:'Rekap Absensi'},
+      {id:'raport',icon:'📜',label:'Raport Santri'},
+    ]},
+    {title:'',items:[
+      {id:'pengumuman',icon:'📢',label:'Pengumuman'},
+    ]},
   ];
-  const waliMenu=[
-    {id:'walirekap',icon:'📋',label:'Rekap Absensi',highlight:true},
-    {id:'walicatatan',icon:'📝',label:'Catatan Guru',highlight:false},
-    {id:'pengumuman',icon:'📢',label:'Pengumuman',highlight:false},
+  const waliGroups=[
+    {title:'',items:[
+      {id:'walirekap',icon:'📋',label:'Rekap Absensi Anak'},
+      {id:'walicatatan',icon:'📝',label:'Catatan Guru'},
+      {id:'pengumuman',icon:'📢',label:'Pengumuman'},
+    ]},
   ];
-  const menu=me.role==='admin'?adminMenu:me.role==='wali'?waliMenu:ustadzMenu;
-  $('gridMenu').innerHTML=menu.map(m=>'<div class="menu-item'+(m.highlight?' highlight':'')+'" onclick="handleMenuClick(\''+m.id+'\')"><div class="menu-icon">'+m.icon+'</div><div class="menu-label">'+m.label+'</div></div>').join('');
-  // Full menu page
-  $('fullMenu').innerHTML=menu.map(m=>'<div class="menu-item'+(m.highlight?' highlight':'')+'" onclick="handleMenuClick(\''+m.id+'\')"><div class="menu-icon">'+m.icon+'</div><div class="menu-label">'+m.label+'</div></div>').join('');
+  const groups=me.role==='admin'?adminGroups:me.role==='wali'?waliGroups:ustadzGroups;
+  function renderGroups(container){
+    let html='';
+    groups.forEach(g=>{
+      if(g.title)html+='<div class="menu-group-title">'+g.title+'</div>';
+      html+='<div class="grid-menu">';
+      g.items.forEach(m=>{
+        html+='<div class="menu-item" onclick="handleMenuClick(\''+m.id+'\')">';
+        html+='<div class="menu-icon">'+m.icon+'</div>';
+        html+='<div class="menu-label">'+m.label+'</div>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+    $(container).innerHTML=html;
+  }
+  renderGroups('gridMenu');
+  renderGroups('fullMenu');
 }
 
 function handleMenuClick(id){

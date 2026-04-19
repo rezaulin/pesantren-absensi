@@ -674,13 +674,162 @@ tr:hover{background:var(--bg)}
 }
 
 /* ============================
-   RESPONSIVE
+   MOBILE STYLES (<992px)
    ============================ */
-@media(min-width:600px){
-  .absensi-grid{grid-template-columns:1fr 1fr}
-  .stats{grid-template-columns:repeat(4,1fr)}
-  .quick-actions{grid-template-columns:repeat(4,1fr)}
+@media(max-width:991px){
+  /* Body: safe area untuk bottom nav + notch */
+  body{
+    padding-bottom:72px;
+    padding-top:env(safe-area-inset-top,0);
+    padding-bottom:calc(72px + env(safe-area-inset-bottom,0px));
+  }
+
+  /* Header compact ala app */
+  .header{
+    padding:.5rem .75rem;
+    min-height:48px;
+  }
+  .header-title{font-size:.95rem}
+  .header-icon{width:32px;height:32px;font-size:1.1rem}
+  .profile-pic{width:30px;height:30px;font-size:.8rem}
+  .notif-badge{min-width:15px;height:15px;font-size:.5rem}
+
+  /* Sidebar: overlay penuh, bukan push */
+  .sidebar{
+    left:-100%;
+    width:85%;
+    max-width:320px;
+    z-index:200;
+    box-shadow:4px 0 20px rgba(0,0,0,.2);
+  }
+  .sidebar.open{left:0}
+
+  /* Content: full width, padding pas */
+  .content{
+    padding:.6rem .75rem;
+    padding-bottom:0;
+    margin-left:0;
+  }
+  .header{margin-left:0}
+
+  /* Welcome banner compact */
+  .welcome-banner{
+    padding:.8rem 1rem;
+    margin-bottom:.7rem;
+    border-radius:14px;
+  }
+  .welcome-banner h3{font-size:.92rem;margin-bottom:.15rem}
+  .welcome-banner p{font-size:.7rem}
+
+  /* Stats: 2x2 grid kecil & padat */
+  .stats{
+    grid-template-columns:repeat(2,1fr);
+    gap:.45rem;
+    margin-bottom:.7rem;
+  }
+  .stat-card{
+    padding:.6rem .5rem;
+    border-radius:12px;
+    min-height:0;
+  }
+  .stat-card .num{font-size:1.2rem;font-weight:800}
+  .stat-card .label{font-size:.6rem;margin-top:.15rem}
+  .stat-card .icon{font-size:1.3rem;right:6px;top:6px}
+
+  /* Quick actions compact */
+  .quick-actions{
+    grid-template-columns:repeat(4,1fr);
+    gap:.4rem;
+    margin-bottom:.7rem;
+  }
+  .quick-action{
+    padding:.55rem .2rem;
+    border-radius:12px;
+    min-height:0;
+  }
+  .quick-action .qa-icon{
+    font-size:1.25rem;
+    width:38px;height:38px;
+    border-radius:10px;
+  }
+  .quick-action .qa-label{font-size:.58rem}
+
+  /* Widget cards compact */
+  .widget-card{
+    padding:.75rem;
+    border-radius:12px;
+    margin-bottom:.6rem;
+  }
+  .widget-title{font-size:.78rem;margin-bottom:.4rem}
+
+  /* Feed cards compact */
+  .feed-card{
+    padding:.55rem .7rem;
+    border-radius:10px;
+  }
+  .feed-card .feed-name{font-size:.8rem}
+  .feed-card .feed-meta{font-size:.65rem}
+
+  /* Section title compact */
+  .section-title{font-size:.88rem;margin:.7rem 0 .5rem}
+
+  /* Tables: smaller font on mobile */
+  table{font-size:.75rem}
+  th{padding:.45rem .5rem;font-size:.65rem}
+  td{padding:.45rem .5rem}
+
+  /* Filter bar compact */
+  .filter-bar select,.filter-bar input{padding:.35rem .5rem;font-size:.75rem}
+
+  /* Bottom nav: native app feel */
+  .bottom-nav{
+    height:56px;
+    padding-bottom:env(safe-area-inset-bottom,0);
+    box-shadow:0 -1px 15px rgba(0,0,0,.08);
+  }
+  .nav-item{
+    font-size:.58rem;
+    padding:.35rem .4rem;
+    min-width:48px;
+  }
+  .nav-item .nav-icon{font-size:1.15rem}
+
+  /* Hide desktop-only elements */
+  .desktop-table{display:none!important}
+  .card-feed{display:flex}
+
+  /* Santri rows compact */
+  .santri-row{padding:.45rem .6rem}
+  .santri-row .nama{font-size:.8rem}
+  .status-btn{padding:.25rem .4rem;font-size:.65rem;min-width:30px}
+
+  /* Absensi toolbar compact */
+  .absensi-toolbar .search-input{padding:.4rem .65rem;font-size:.8rem}
+  .btn-semua-hadir{padding:.4rem .7rem;font-size:.72rem}
+  .counter-bar{margin-bottom:.4rem}
+  .counter-item{padding:.25rem .5rem;font-size:.65rem}
+
+  /* Modal compact */
+  .modal{padding:1.2rem;width:92%;border-radius:14px}
+  .modal h3{font-size:1rem}
+
+  /* Login compact */
+  .login-box{padding:1.8rem 1.5rem;width:92%}
+  .login-box h1{font-size:1.4rem}
 }
+
+/* ============================
+   TABLET (600-991px)
+   ============================ */
+@media(min-width:600px) and (max-width:991px){
+  .stats{grid-template-columns:repeat(4,1fr)}
+  .absensi-grid{grid-template-columns:1fr 1fr}
+  .content{padding:.8rem 1.2rem}
+}
+
+/* ============================
+   DESKTOP (≥992px)
+   ============================ */
 @media(min-width:992px){
   /* Sidebar permanen */
   .sidebar{left:0;box-shadow:none;border-right:1px solid var(--border);z-index:10}
@@ -698,6 +847,8 @@ tr:hover{background:var(--bg)}
   /* Dashboard: kartu feed jadi tabel di desktop */
   .card-feed{display:none}
   .desktop-table{display:block!important}
+  /* Stats 4 kolom */
+  .stats{grid-template-columns:repeat(4,1fr)}
 }
 
 /* ============================

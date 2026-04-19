@@ -51,6 +51,145 @@
   --radius-full:9999px;
 }
 
+/* ============================
+   DARK MODE
+   ============================ */
+.dark{
+  --bg:#0f172a;
+  --bg-alt:#1e293b;
+  --card:#1e293b;
+  --text:#e2e8f0;
+  --text-light:#64748b;
+  --text-muted:#94a3b8;
+  --border:#334155;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.2),0 1px 3px rgba(0,0,0,.3);
+  --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.3);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,.3),0 8px 20px rgba(0,0,0,.35);
+  --shadow-lg:0 10px 25px -3px rgba(0,0,0,.4),0 4px 10px rgba(0,0,0,.3);
+}
+.dark body{background:#0f172a;color:#e2e8f0}
+
+/* Dark: Header */
+.dark .header{background:#0f172a;border-bottom:1px solid #1e293b}
+
+/* Dark: Sidebar */
+.dark .sidebar{background:#1e293b}
+.dark .sidebar-header{background:linear-gradient(135deg,#0f172a,#1e293b)}
+.dark .sidebar li{border-bottom-color:#334155}
+.dark .sidebar li a{color:#e2e8f0}
+.dark .sidebar li a:hover,.dark .sidebar li a.active{background:rgba(13,148,136,.15);color:#14b8a6}
+
+/* Dark: Welcome banner */
+.dark .welcome-banner{background:linear-gradient(135deg,#1e293b 0%,#0f172a 50%,#134e4a 100%)}
+
+/* Dark: Cards */
+.dark .stat-card{background:#1e293b;border-color:#334155}
+.dark .stat-card.blue{background:linear-gradient(135deg,#1e3a5f,#1e293b);border-color:#1e3a5f}
+.dark .stat-card.green{background:linear-gradient(135deg,#14532d,#1e293b);border-color:#14532d}
+.dark .stat-card.orange{background:linear-gradient(135deg,#78350f,#1e293b);border-color:#78350f}
+.dark .stat-card.red{background:linear-gradient(135deg,#7f1d1d,#1e293b);border-color:#7f1d1d}
+
+/* Dark: Menu items */
+.dark .menu-item{background:#1e293b;border-color:#334155}
+.dark .menu-item:hover{border-color:#14b8a6;box-shadow:0 4px 12px rgba(13,148,136,.2)}
+.dark .menu-icon{background:rgba(13,148,136,.15)}
+.dark .menu-label{color:#e2e8f0}
+.dark .menu-group-title{color:#94a3b8}
+
+/* Dark: Widgets */
+.dark .widget-card{background:#1e293b;border-color:#334155}
+.dark .widget-title{color:#e2e8f0}
+
+/* Dark: Feed cards */
+.dark .feed-card{background:#1e293b;border-color:#334155}
+.dark .feed-card .feed-name{color:#e2e8f0}
+
+/* Dark: Quick actions (jika ada) */
+.dark .quick-action{background:#1e293b;border-color:#334155}
+.dark .quick-action .qa-icon{background:rgba(13,148,136,.15)}
+
+/* Dark: Bottom nav */
+.dark .bottom-nav{background:#1e293b;border-top-color:#334155}
+.dark .nav-item{color:#64748b}
+.dark .nav-item.active{color:#14b8a6}
+
+/* Dark: Tables */
+.dark .table-wrap{background:#1e293b;border-color:#334155}
+.dark table{color:#e2e8f0}
+.dark th{background:#0f172a}
+.dark td{border-bottom-color:#334155}
+.dark tr:hover{background:rgba(255,255,255,.03)}
+
+/* Dark: Forms */
+.dark .form-group input,.dark .form-group select,.dark .form-group textarea{background:#0f172a;color:#e2e8f0;border-color:#334155}
+.dark .form-group input:focus,.dark .form-group select:focus{background:#1e293b}
+
+/* Dark: Absensi */
+.dark .santri-row{background:#1e293b;border-color:#334155}
+.dark .santri-row .nama{color:#e2e8f0}
+.dark .santri-row.hadir{background:rgba(13,148,136,.1);border-left-color:#14b8a6}
+.dark .santri-row.izin{background:rgba(234,179,8,.1);border-left-color:#eab308}
+.dark .santri-row.sakit{background:rgba(59,130,246,.1);border-left-color:#3b82f6}
+.dark .santri-row.alpa{background:rgba(239,68,68,.1);border-left-color:#ef4444}
+.dark .status-btn{background:#0f172a;border-color:#334155;color:#94a3b8}
+.dark .status-btn.active-H{background:rgba(13,148,136,.2);border-color:#14b8a6;color:#14b8a6}
+.dark .status-btn.active-I{background:rgba(234,179,8,.15);border-color:#eab308;color:#eab308}
+.dark .status-btn.active-S{background:rgba(59,130,246,.15);border-color:#3b82f6;color:#3b82f6}
+.dark .status-btn.active-A{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444}
+
+/* Dark: Counter bar */
+.dark .counter-h{background:rgba(13,148,136,.15);color:#14b8a6}
+.dark .counter-i{background:rgba(234,179,8,.15);color:#eab308}
+.dark .counter-s{background:rgba(59,130,246,.15);color:#3b82f6}
+.dark .counter-a{background:rgba(239,68,68,.15);color:#ef4444}
+.dark .counter-total{background:#0f172a;color:#94a3b8}
+
+/* Dark: Search input */
+.dark .absensi-toolbar .search-input{background:#0f172a;color:#e2e8f0;border-color:#334155}
+
+/* Dark: Filter bar */
+.dark .filter-bar select,.dark .filter-bar input{background:#0f172a;color:#e2e8f0;border-color:#334155}
+
+/* Dark: Kegiatan tabs */
+.dark .kegiatan-tab{background:#0f172a;color:#94a3b8}
+.dark .kegiatan-tab.active{background:#0d9488;color:#fff}
+
+/* Dark: Modal */
+.dark .modal{background:#1e293b;color:#e2e8f0}
+
+/* Dark: Toast */
+.dark .toast{background:#334155;color:#e2e8f0}
+
+/* Dark: Pengumuman */
+.dark .announce-card{background:#1e293b;border-color:#334155}
+
+/* Dark: Login */
+.dark .login-wrap{background:linear-gradient(145deg,#020617 0%,#0f172a 40%,#134e4a 100%)!important}
+.dark .login-box{background:#1e293b}
+.dark .login-box input{background:#0f172a;color:#e2e8f0;border-color:#334155}
+.dark .login-box input:focus{background:#1e293b}
+
+/* Dark: Overlay */
+.dark .overlay{background:rgba(0,0,0,.7)}
+
+/* Dark: Dashboard bg — tetap nampak dengan overlay gelap */
+.dark .grid-menu.has-dashboard-bg{
+  position:relative;
+}
+.dark .grid-menu.has-dashboard-bg::after{
+  content:'';position:absolute;inset:0;
+  background:rgba(15,23,42,.6);
+  border-radius:inherit;pointer-events:none;
+}
+
+/* Dark mode toggle button */
+.dark-toggle{
+  background:none;border:none;color:#fff;font-size:1.15rem;cursor:pointer;
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius);transition:background .15s;
+}
+.dark-toggle:hover{background:rgba(255,255,255,.1)}
+
 body{
   font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
   background:var(--bg);
@@ -905,7 +1044,8 @@ tr:hover{background:var(--bg)}
       <div id="dashboardSearchResults" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 10px 10px;max-height:250px;overflow-y:auto;display:none;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
     </div>
     <div class="header-right">
-      <button class="header-icon" onclick="navigate('pengumuman')">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></button>
+      <button class="dark-toggle" onclick="toggleDarkMode()" id="darkToggle" title="Mode Gelap">🌙</button>
+      <button class="header-icon" onclick="switchTab('pengumuman')">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></button>
       <div class="profile-pic" id="profilePic">👤</div>
     </div>
   </div>
@@ -1284,6 +1424,22 @@ const API='';
 let token=localStorage.getItem('token');
 let me=null;
 let currentTab='home';
+
+// Dark Mode
+function toggleDarkMode(){
+  const isDark=document.documentElement.classList.toggle('dark');
+  localStorage.setItem('darkMode',isDark?'1':'0');
+  $('darkToggle').textContent=isDark?'☀️':'🌙';
+}
+function initDarkMode(){
+  if(localStorage.getItem('darkMode')==='1'){
+    document.documentElement.classList.add('dark');
+    const btn=$('darkToggle');
+    if(btn)btn.textContent='☀️';
+  }
+}
+// Init dark mode immediately (before page renders)
+initDarkMode();
 
 // Helpers
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show')}
@@ -2680,6 +2836,7 @@ async function hapusSetting(field,previewId,placeholderId){
     if(field==='dashboard_bg'){
       document.querySelectorAll('.grid-menu').forEach(grid=>{
         grid.style.background='';grid.style.borderRadius='';grid.style.padding='';grid.style.marginTop='';
+        grid.classList.remove('has-dashboard-bg');
       });
       document.querySelectorAll('.menu-item').forEach(item=>{
         item.style.background='';item.style.backdropFilter='';item.style.webkitBackdropFilter='';
@@ -2768,6 +2925,7 @@ async function loadAppSettings(){
         grid.style.position='relative';
         grid.style.padding='0.7rem';
         grid.style.marginTop='0.5rem';
+        grid.classList.add('has-dashboard-bg');
       });
       // Efek frosted glass pada menu item
       document.querySelectorAll('.menu-item').forEach(item=>{

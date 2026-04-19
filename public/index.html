@@ -585,11 +585,101 @@ tr:hover{background:var(--bg)}
 .welcome-banner p{font-size:.78rem;opacity:.85;position:relative;z-index:1}
 
 /* ============================
+   MOBILE-FIRST DASHBOARD
+   ============================ */
+
+/* Header search: hidden on mobile, visible on desktop */
+.header-center{display:none}
+@media(min-width:992px){
+  .header-center{display:block!important}
+}
+
+/* Quick Actions - shortcut ikon harian */
+.quick-actions{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:.6rem;
+  margin-bottom:1rem;
+}
+.quick-action{
+  display:flex;flex-direction:column;align-items:center;gap:.35rem;
+  padding:.7rem .3rem;
+  background:#fff;
+  border-radius:14px;
+  cursor:pointer;
+  transition:all .2s;
+  border:1px solid var(--border);
+  box-shadow:var(--shadow-sm);
+}
+.quick-action:hover{
+  transform:translateY(-3px);
+  box-shadow:var(--shadow-md);
+  border-color:var(--primary-light);
+}
+.quick-action:active{transform:scale(.93)}
+.quick-action .qa-icon{
+  font-size:1.5rem;
+  width:44px;height:44px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--primary-bg);
+  border-radius:12px;
+}
+.quick-action .qa-label{
+  font-size:.65rem;font-weight:600;color:var(--text);
+  text-align:center;line-height:1.2;
+}
+
+/* Card Feed - pengganti tabel di mobile */
+.card-feed{
+  display:flex;flex-direction:column;gap:.45rem;
+  margin-bottom:.8rem;
+}
+.feed-card{
+  background:#fff;
+  border-radius:var(--radius);
+  padding:.7rem .85rem;
+  box-shadow:var(--shadow-sm);
+  border:1px solid var(--border);
+  border-left:4px solid var(--red);
+  transition:box-shadow .15s;
+}
+.feed-card:hover{box-shadow:var(--shadow)}
+.feed-card .feed-name{font-weight:700;font-size:.85rem;color:var(--text)}
+.feed-card .feed-meta{
+  font-size:.72rem;color:var(--text-muted);
+  margin-top:.2rem;
+  display:flex;gap:.5rem;flex-wrap:wrap;
+}
+.feed-card .feed-badge{
+  display:inline-block;
+  padding:.15rem .5rem;
+  border-radius:var(--radius-full);
+  font-size:.65rem;font-weight:600;
+}
+
+/* Widget card style */
+.widget-card{
+  background:#fff;
+  border-radius:var(--radius-lg);
+  padding:1rem;
+  margin-bottom:.8rem;
+  box-shadow:var(--shadow-sm);
+  border:1px solid var(--border);
+}
+.widget-title{
+  font-weight:700;
+  font-size:.85rem;
+  margin-bottom:.6rem;
+  display:flex;align-items:center;gap:.4rem;
+}
+
+/* ============================
    RESPONSIVE
    ============================ */
 @media(min-width:600px){
   .absensi-grid{grid-template-columns:1fr 1fr}
   .stats{grid-template-columns:repeat(4,1fr)}
+  .quick-actions{grid-template-columns:repeat(4,1fr)}
 }
 @media(min-width:992px){
   /* Sidebar permanen */
@@ -605,6 +695,9 @@ tr:hover{background:var(--bg)}
   .bottom-nav{display:none!important}
   /* Padding body hilang */
   body{padding-bottom:0}
+  /* Dashboard: kartu feed jadi tabel di desktop */
+  .card-feed{display:none}
+  .desktop-table{display:block!important}
 }
 
 /* ============================
@@ -653,7 +746,7 @@ tr:hover{background:var(--bg)}
       <button class="header-icon" onclick="toggleSidebar()">☰</button>
       <span class="header-title" id="headerTitle">FAONSI</span>
     </div>
-    <div class="header-center" style="flex:1;max-width:300px;margin:0 .5rem;position:relative">
+    <div class="header-center" id="headerSearchWrap" style="flex:1;max-width:300px;margin:0 .5rem;position:relative">
       <input type="text" id="headerSearch" placeholder="🔍 Cari santri..." style="width:100%;padding:.45rem .8rem;border:1px solid rgba(255,255,255,.15);border-radius:10px;font-size:.8rem;background:rgba(255,255,255,.08);color:#fff;box-sizing:border-box;outline:none" oninput="searchSantriDashboard(this.value)" onfocus="if(this.value)searchSantriDashboard(this.value)" autocomplete="off">
       <div id="dashboardSearchResults" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 10px 10px;max-height:250px;overflow-y:auto;display:none;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
     </div>
@@ -689,6 +782,11 @@ tr:hover{background:var(--bg)}
         <p id="welcomeDate"></p>
       </div>
       <div class="stats" id="statsContainer"></div>
+
+      <!-- Quick Actions - shortcut harian -->
+      <div class="quick-actions" id="quickActions"></div>
+
+      <!-- Dashboard Widgets (mobile: card feed, desktop: table) -->
       <div id="dashboardSantriProfile"></div>
       <div id="dashboardWidgets"></div>
     </div>
@@ -1008,9 +1106,6 @@ tr:hover{background:var(--bg)}
   <button class="nav-item active" onclick="switchTab('home')" id="navtab-home">
     <span class="nav-icon">🏠</span>Beranda
   </button>
-  <button class="nav-item" onclick="switchTab('santri')" id="navtab-santri">
-    <span class="nav-icon">👨‍🎓</span>Santri
-  </button>
   <button class="nav-item" onclick="switchTab('absensi')" id="navtab-absensi">
     <span class="nav-icon">✅</span>Absen
   </button>
@@ -1018,7 +1113,10 @@ tr:hover{background:var(--bg)}
     <span class="nav-icon">📋</span>Rekap
   </button>
   <button class="nav-item" onclick="switchTab('menu')" id="navtab-menu">
-    <span class="nav-icon">☰</span>Menu
+    <span class="nav-icon">📂</span>Menu
+  </button>
+  <button class="nav-item" onclick="toggleSidebar()" id="navtab-more">
+    <span class="nav-icon">☰</span>Lainnya
   </button>
 </div>
 
@@ -1256,30 +1354,64 @@ async function loadDashboard(){
     loadWaliDashboard();
     return;
   }
+  // Stats 2x2 (mobile) / 4 kolom (desktop)
   $('statsContainer').innerHTML=
     '<div class="stat-card blue"><span class="icon">👥</span><div class="num">'+(d.total_santri||0)+'</div><div class="label">Total Santri</div></div>'+
     '<div class="stat-card green"><span class="icon">✅</span><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
     '<div class="stat-card orange"><span class="icon">📝</span><div class="num">'+(d.izin_sakit||0)+'</div><div class="label">Izin/Sakit</div></div>'+
     '<div class="stat-card red"><span class="icon">❌</span><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
+
+  // Quick Actions - 4 shortcut harian
+  let qaHtml='';
+  const quickItems=[
+    {id:'absensi',icon:'✅',label:'Absen\nKelas'},
+    {id:'absenmalam',icon:'🌙',label:'Absen\nMalam'},
+    {id:'santri',icon:'👨‍🎓',label:'Data\nSantri'},
+    {id:'pelanggaran',icon:'⚠️',label:'Input\nPelanggaran'},
+  ];
+  quickItems.forEach(q=>{
+    qaHtml+='<div class="quick-action" onclick="switchTab(\''+q.id+'\')">';
+    qaHtml+='<div class="qa-icon">'+q.icon+'</div>';
+    qaHtml+='<div class="qa-label">'+q.label.replace('\n','<br>')+'</div>';
+    qaHtml+='</div>';
+  });
+  $('quickActions').innerHTML=qaHtml;
+
   // Dashboard widgets
   let wHtml='';
+
   // Widget: Santri Alfa Hari Ini
   if(d.alfa_list&&d.alfa_list.length){
-    wHtml+='<div style="background:#fff;border-radius:14px;padding:1rem;margin-bottom:.8rem;box-shadow:var(--shadow-sm);border:1px solid var(--border)">';
-    wHtml+='<div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;color:var(--red)">❌ Santri Alfa Hari Ini ('+d.alfa_list.length+')</div>';
-    wHtml+='<div style="overflow-x:auto"><table style="width:100%;font-size:.8rem"><thead><tr style="background:var(--bg-alt)"><th style="padding:.4rem .5rem;text-align:left">No</th><th style="padding:.4rem .5rem;text-align:left">Nama</th><th style="padding:.4rem .5rem;text-align:left">Kamar</th><th style="padding:.4rem .5rem;text-align:left">Kegiatan</th></tr></thead><tbody>';
+    // Mobile: card feed
+    wHtml+='<div class="widget-card">';
+    wHtml+='<div class="widget-title" style="color:var(--red)">❌ Santri Alfa Hari Ini ('+d.alfa_list.length+')</div>';
+    // Card feed (mobile)
+    wHtml+='<div class="card-feed">';
+    d.alfa_list.forEach((a,i)=>{
+      wHtml+='<div class="feed-card">';
+      wHtml+='<div class="feed-name">'+a.nama+'</div>';
+      wHtml+='<div class="feed-meta">';
+      wHtml+='<span>🏠 '+(a.kamar||'-')+'</span>';
+      wHtml+='<span>📚 '+(a.kegiatan||'-')+'</span>';
+      wHtml+='</div></div>';
+    });
+    wHtml+='</div>';
+    // Desktop table
+    wHtml+='<div class="desktop-table" style="display:none;overflow-x:auto"><table style="width:100%;font-size:.8rem"><thead><tr style="background:var(--bg-alt)"><th style="padding:.4rem .5rem;text-align:left">No</th><th style="padding:.4rem .5rem;text-align:left">Nama</th><th style="padding:.4rem .5rem;text-align:left">Kamar</th><th style="padding:.4rem .5rem;text-align:left">Kegiatan</th></tr></thead><tbody>';
     d.alfa_list.forEach((a,i)=>{
       wHtml+='<tr><td style="padding:.35rem .5rem">'+(i+1)+'</td><td style="padding:.35rem .5rem;font-weight:600">'+a.nama+'</td><td style="padding:.35rem .5rem">'+(a.kamar||'-')+'</td><td style="padding:.35rem .5rem">'+(a.kegiatan||'-')+'</td></tr>';
     });
-    wHtml+='</tbody></table></div></div>';
+    wHtml+='</tbody></table></div>';
+    wHtml+='</div>';
   }
+
   // Widget: Pengumuman Terbaru
   const ann=await api('/api/pengumuman');
   if(ann&&ann.length){
-    wHtml+='<div style="background:#fff;border-radius:14px;padding:1rem;margin-bottom:.8rem;box-shadow:var(--shadow-sm);border:1px solid var(--border)">';
-    wHtml+='<div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;color:var(--primary)">📢 Pengumuman Terbaru</div>';
+    wHtml+='<div class="widget-card">';
+    wHtml+='<div class="widget-title" style="color:var(--primary)">📢 Pengumuman Terbaru</div>';
     ann.slice(0,3).forEach(a=>{
-      wHtml+='<div style="padding:.5rem 0;border-bottom:1px solid var(--border)">';
+      wHtml+='<div style="padding:.5rem 0;border-bottom:1px solid var(--border)">'
       wHtml+='<div style="font-weight:600;font-size:.82rem">'+a.judul+'</div>';
       wHtml+='<div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem">'+(a.created_by_nama||'Admin')+' • '+new Date(a.created_at).toLocaleDateString('id-ID')+'</div>';
       wHtml+='</div>';

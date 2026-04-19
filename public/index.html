@@ -1424,11 +1424,14 @@ function buildGridMenu(){
     ]},
   ];
   const groups=me.role==='admin'?adminGroups:me.role==='wali'?waliGroups:ustadzGroups;
-  function renderGroups(container,excludePengaturan){
+  // Quick action IDs — jangan tampil double di dashboard menu grid
+  const quickActionIds=['absensi','absenmalam','santri','pelanggaran'];
+  function renderGroups(container,excludePengaturan,excludeQuickActions){
     let html='';
     groups.forEach(g=>{
       let items=g.items;
       if(excludePengaturan)items=items.filter(m=>m.id!=='pengaturan');
+      if(excludeQuickActions)items=items.filter(m=>!quickActionIds.includes(m.id));
       if(!items.length)return;
       if(g.title)html+='<div class="menu-group-title">'+g.title+'</div>';
       html+='<div class="grid-menu">';
@@ -1442,8 +1445,8 @@ function buildGridMenu(){
     });
     $(container).innerHTML=html;
   }
-  renderGroups('fullMenu',false);
-  renderGroups('dashboardMenuGrid',true);
+  renderGroups('fullMenu',false,false);
+  renderGroups('dashboardMenuGrid',true,true);
 }
 
 function handleMenuClick(id){

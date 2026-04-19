@@ -783,6 +783,7 @@ tr:hover{background:var(--bg)}
         <input type="date" id="rekapUstadzSampai" style="padding:.5rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem">
         <button class="btn btn-primary btn-sm" onclick="loadRekapUstadz()">🔍 Filter</button>
         <button class="btn btn-outline btn-sm" onclick="exportRekapUstadzPDF()">📥 PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="exportRekapUstadzExcel()">📊 Excel</button>
       </div>
       <div id="rekapUstadzContent"></div>
     </div>
@@ -1798,6 +1799,16 @@ async function exportRekapUstadzPDF(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='rekap-ustadz.pdf';a.click();
   URL.revokeObjectURL(url);
+}
+async function exportRekapUstadzExcel(){
+  const params=new URLSearchParams();
+  if($('rekapUstadzDari').value)params.set('dari',$('rekapUstadzDari').value);
+  if($('rekapUstadzSampai').value)params.set('sampai',$('rekapUstadzSampai').value);
+  const res=await fetch('/api/rekap-ustadz/excel?'+params.toString(),{headers:{'Authorization':'Bearer '+token}});
+  if(!res.ok){try{const e=await res.json();toast(e.message||'Gagal export')}catch(_){toast('Gagal export')}return}
+  const blob=await res.blob();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rekap-ustadz.xlsx';a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // Pengumuman

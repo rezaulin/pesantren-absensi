@@ -1554,4 +1554,151 @@ app.get('/api/rekap-ustadz/pdf', authenticate, (req, res) => {
   doc.end();
 });
 
+// ── Rekap Ustadz Excel ─────────────────────────────────
+app.get('/api/rekap-ustadz/excel', authenticate, async (req, res) => {
+  const dataSettings = loadDB();
+  const appName = (dataSettings.settings && dataSettings.settings.app_name) || 'Pesantren';
+  const alamatLembaga = (dataSettings.settings && dataSettings.settings.alamat_lembaga) || '';
+  const logoData = (dataSettings.settings && dataSettings.settings.logo) || '';
+  const bulanNama = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+  if (!db.absensi_sesi) db.absensi_sesi = [];
+  let sesiList = db.absensi_sesi;
+  if (req.query.dari) sesiList = sesiList.filter(s => s.tanggal >= req.query.dari);
+  if (req.query.sampai) sesiList = sesiList.filter(s => s.tanggal <= req.query.sampai);
+
+  // Deteksi kegiatan aktif
+  const kegiatanAktifSet = new Map();
+  sesiList.forEach(s => {
+    let namaKeg = null, kategoriKeg = 'tambahan', urutanKeg = 0;
+    if (s.kegiatan_id && s.kegiatan_id > 0) {
+      const kg = db.kegiatan.find(k => k.id === s.kegiatan_id);
+      if (kg) { namaKeg = kg.nama; kategoriKeg = kg.kategori || 'tambahan'; urutanKeg = kg.urutan_tampil || 0; }
+    } else if (s.kegiatan_nama) {
+      namaKeg = s.kegiatan_nama;
+      const kg = db.kegiatan.find(k => k.nama === s.kegiatan_nama);
+      if (kg) { kategoriKeg = kg.kategori || 'tambahan'; urutanKeg = kg.urutan_tampil || 0; }
+    }
+    if (namaKeg && !kegiatanAktifSet.has(namaKeg)) kegiatanAktifSet.set(namaKeg, { nama: namaKeg, kategori: kategoriKeg, urutan: urutanKeg });
+  });
+  const kegiatanList = Array.from(kegiatanAktifSet.values()).sort((a, b) => {
+    if (a.kategori !== b.kategori) return a.kategori === 'pokok' ? -1 : 1;
+    return a.urutan - b.urutan;
+  });
+
+  // Pivot per ustadz
+  const users = db.users.filter(u => u.role !== 'wali');
+  const pivotData = users.map(u => {
+    const userSesi = sesiList.filter(s => s.ustadz_username === u.username);
+    if (userSesi.length === 0) return null;
+    const perKegiatan = {};
+    kegiatanList.forEach(k => { perKegiatan[k.nama] = 0; });
+    userSesi.forEach(s => {
+      let namaKeg = s.kegiatan_nama;
+      if (!namaKeg && s.kegiatan_id) { const kg = db.kegiatan.find(k => k.id === s.kegiatan_id); if (kg) namaKeg = kg.nama; }
+      if (namaKeg && perKegiatan[namaKeg] !== undefined) perKegiatan[namaKeg]++;
+    });
+    return { nama: u.nama, username: u.username, per_kegiatan: perKegiatan, total: userSesi.length };
+  }).filter(Boolean).sort((a, b) => b.total - a.total);
+
+  // Buat Excel
+  const wb = new ExcelJS.Workbook();
+  wb.creator = appName;
+  const ws = wb.addWorksheet('Rekap Ustadz');
+
+  // Logo
+  if (logoData && logoData.startsWith('data:')) {
+    try {
+      const ext = logoData.split(';')[0].split('/')[1];
+      const imageId = wb.addImage({ base64: logoData.split(',')[1], extension: ext === 'svg' ? 'png' : ext });
+      ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 60, height: 60 } });
+    } catch (e) {}
+  }
+
+  // Kop surat
+  const lastCol = String.fromCharCode(65 + 3 + kegiatanList.length); // No, Nama, kegiatan..., Total
+  ws.mergeCells('C1:' + lastCol + '1');
+  ws.getCell('C1').value = appName;
+  ws.getCell('C1').font = { bold: true, size: 16 };
+  ws.getCell('C1').alignment = { horizontal: 'center' };
+
+  ws.mergeCells('C2:' + lastCol + '2');
+  ws.getCell('C2').value = 'REKAPITULASI KEHADIRAN MENGAJAR USTADZ';
+  ws.getCell('C2').font = { bold: true, size: 12 };
+  ws.getCell('C2').alignment = { horizontal: 'center' };
+
+  ws.mergeCells('C3:' + lastCol + '3');
+  ws.getCell('C3').value = alamatLembaga;
+  ws.getCell('C3').font = { size: 10 };
+  ws.getCell('C3').alignment = { horizontal: 'center' };
+
+  // Periode
+  const dariDate = req.query.dari ? new Date(req.query.dari) : new Date();
+  const sampaiDate = req.query.sampai ? new Date(req.query.sampai) : new Date();
+  const periodeLabel = 'Periode: ' + dariDate.getDate() + ' ' + bulanNama[dariDate.getMonth() + 1] + ' ' + dariDate.getFullYear() + ' - ' + sampaiDate.getDate() + ' ' + bulanNama[sampaiDate.getMonth() + 1] + ' ' + sampaiDate.getFullYear();
+  ws.mergeCells('A5:' + lastCol + '5');
+  ws.getCell('A5').value = periodeLabel;
+  ws.getCell('A5').font = { italic: true, size: 10 };
+  ws.getCell('A5').alignment = { horizontal: 'center' };
+
+  // Header tabel
+  const headerRow = 7;
+  const headers = ['No', 'Nama Ustadz', ...kegiatanList.map(k => k.nama), 'Total'];
+  const headerRowObj = ws.getRow(headerRow);
+  headers.forEach((h, i) => {
+    const cell = headerRowObj.getCell(i + 1);
+    cell.value = h;
+    cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E86C1' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  });
+  headerRowObj.height = 25;
+
+  // Data
+  pivotData.forEach((u, idx) => {
+    const row = ws.getRow(headerRow + 1 + idx);
+    row.getCell(1).value = idx + 1;
+    row.getCell(1).alignment = { horizontal: 'center' };
+    row.getCell(2).value = u.nama;
+    kegiatanList.forEach((k, ki) => {
+      const val = u.per_kegiatan[k.nama] || 0;
+      row.getCell(3 + ki).value = val === 0 ? '-' : val;
+      row.getCell(3 + ki).alignment = { horizontal: 'center' };
+    });
+    row.getCell(3 + kegiatanList.length).value = u.total;
+    row.getCell(3 + kegiatanList.length).alignment = { horizontal: 'center' };
+    row.getCell(3 + kegiatanList.length).font = { bold: true };
+
+    for (let c = 1; c <= headers.length; c++) {
+      row.getCell(c).border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    }
+    if (idx % 2 === 0) {
+      for (let c = 1; c <= headers.length; c++) {
+        row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+      }
+    }
+  });
+
+  // Sheet 2: Raw Data
+  const ws2 = wb.addWorksheet('Raw Data');
+  ws2.addRow(['Tanggal', 'Nama Ustadz', 'Kegiatan']);
+  const rawHeader = ws2.getRow(1);
+  rawHeader.font = { bold: true };
+  rawHeader.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E86C1' } };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  });
+  sesiList.forEach(s => {
+    let namaKeg = s.kegiatan_nama;
+    if (!namaKeg && s.kegiatan_id) { const kg = db.kegiatan.find(k => k.id === s.kegiatan_id); if (kg) namaKeg = kg.nama; }
+    ws2.addRow([s.tanggal, s.ustadz_username, namaKeg || '-']);
+  });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=rekap-ustadz.xlsx');
+  await wb.xlsx.write(res);
+  res.end();
+});
+
 app.listen(PORT, () => console.log(`Server jalan di http://localhost:${PORT}`));

@@ -84,6 +84,9 @@ a{color:inherit;text-decoration:none}
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 300'%3E%3Crect x='80' y='120' width='35' height='180' rx='2' fill='rgba(255,255,255,0.06)'/%3E%3Crect x='95' y='80' width='20' height='220' rx='2' fill='rgba(255,255,255,0.04)'/%3E%3Crect x='350' y='150' width='40' height='150' rx='2' fill='rgba(255,255,255,0.05)'/%3E%3Crect x='370' y='100' width='18' height='200' rx='2' fill='rgba(255,255,255,0.03)'/%3E%3Crect x='580' y='130' width='30' height='170' rx='2' fill='rgba(255,255,255,0.06)'/%3E%3Crect x='650' y='160' width='25' height='140' rx='2' fill='rgba(255,255,255,0.04)'/%3E%3Crect x='200' y='180' width='50' height='120' rx='2' fill='rgba(255,255,255,0.03)'/%3E%3C/svg%3E") no-repeat center bottom / contain;
   pointer-events:none;
 }
+/* Custom background: hide decorative pseudo-elements */
+.login-wrap.has-custom-bg::before,
+.login-wrap.has-custom-bg::after{display:none}
 
 .login-box{
   background:#fff;
@@ -937,6 +940,9 @@ tr:hover{background:var(--bg)}
       <!-- Quick Actions - shortcut harian -->
       <div class="quick-actions" id="quickActions"></div>
 
+      <!-- Menu Grid di Dashboard (semua menu kecuali Pengaturan) -->
+      <div id="dashboardMenuGrid"></div>
+
       <!-- Dashboard Widgets (mobile: card feed, desktop: table) -->
       <div id="dashboardSantriProfile"></div>
       <div id="dashboardWidgets"></div>
@@ -1309,7 +1315,6 @@ async function initApp(){
   if(!token){logout();return}
   me=await api('/api/me');
   if(!me||!me.id){logout();return}
-  loadAppSettings();
   $('loginPage').style.display='none';
   $('app').classList.add('active');
   $('bottomNav').style.display='flex';
@@ -1317,6 +1322,7 @@ async function initApp(){
   $('roleBadge').textContent=me.role==='admin'?'👑 Admin':me.role==='wali'?'👪 Wali Santri':'📖 Ustadz';
   buildNav();
   buildGridMenu();
+  loadAppSettings(); // after buildGridMenu so dashboard bg applies
   switchTab('home');
 }
 
@@ -1418,12 +1424,15 @@ function buildGridMenu(){
     ]},
   ];
   const groups=me.role==='admin'?adminGroups:me.role==='wali'?waliGroups:ustadzGroups;
-  function renderGroups(container){
+  function renderGroups(container,excludePengaturan){
     let html='';
     groups.forEach(g=>{
+      let items=g.items;
+      if(excludePengaturan)items=items.filter(m=>m.id!=='pengaturan');
+      if(!items.length)return;
       if(g.title)html+='<div class="menu-group-title">'+g.title+'</div>';
       html+='<div class="grid-menu">';
-      g.items.forEach(m=>{
+      items.forEach(m=>{
         html+='<div class="menu-item" onclick="handleMenuClick(\''+m.id+'\')">';
         html+='<div class="menu-icon">'+m.icon+'</div>';
         html+='<div class="menu-label">'+m.label+'</div>';
@@ -1433,7 +1442,8 @@ function buildGridMenu(){
     });
     $(container).innerHTML=html;
   }
-  renderGroups('fullMenu');
+  renderGroups('fullMenu',false);
+  renderGroups('dashboardMenuGrid',true);
 }
 
 function handleMenuClick(id){
@@ -2668,8 +2678,9 @@ async function hapusSetting(field,previewId,placeholderId){
     $(placeholderId).style.display='';
     // Reset background langsung tanpa reload
     if(field==='dashboard_bg'){
-      const grid=$('gridMenu');
-      if(grid){grid.style.background='';grid.style.borderRadius='';grid.style.padding='';grid.style.marginTop=''}
+      document.querySelectorAll('.grid-menu').forEach(grid=>{
+        grid.style.background='';grid.style.borderRadius='';grid.style.padding='';grid.style.marginTop='';
+      });
       document.querySelectorAll('.menu-item').forEach(item=>{
         item.style.background='';item.style.backdropFilter='';item.style.webkitBackdropFilter='';
         item.style.border='';item.style.boxShadow='';
@@ -2679,8 +2690,7 @@ async function hapusSetting(field,previewId,placeholderId){
     }
     if(field==='background'){
       $('loginPage').style.background='';
-      $('loginPage').style.backgroundSize='';
-      $('loginPage').style.backgroundPosition='';
+      $('loginPage').classList.remove('has-custom-bg');
     }
     if(field==='logo'){
       $('loginTitle').textContent='Pesantren Absensi';
@@ -2745,21 +2755,20 @@ async function loadAppSettings(){
       if(sidebarLogo){sidebarLogo.src=s.logo;sidebarLogo.style.display='block'}
     }
     if(s&&s.background){
-      // Background login
-      document.documentElement.style.setProperty('--login-bg','url('+s.background+')');
-      $('loginPage').style.backgroundSize='cover';
-      $('loginPage').style.backgroundPosition='center';
+      // Background login — set langsung ke inline style
+      $('loginPage').style.background="url('"+s.background+"') center/cover no-repeat";
+      // Sembunyikan pseudo-element overlay supaya background terlihat
+      $('loginPage').classList.add('has-custom-bg');
     }
     if(s&&s.dashboard_bg){
-      // Background di grid menu (area icon menu)
-      const grid=$('gridMenu');
-      if(grid){
-        grid.style.background='url('+s.dashboard_bg+') center/cover no-repeat';
+      // Background di semua grid-menu di dashboard
+      document.querySelectorAll('.grid-menu').forEach(grid=>{
+        grid.style.background="url('"+s.dashboard_bg+"') center/cover no-repeat";
         grid.style.borderRadius='var(--radius-lg)';
         grid.style.position='relative';
         grid.style.padding='0.7rem';
         grid.style.marginTop='0.5rem';
-      }
+      });
       // Efek frosted glass pada menu item
       document.querySelectorAll('.menu-item').forEach(item=>{
         item.style.background='rgba(255,255,255,0.7)';
@@ -2768,7 +2777,6 @@ async function loadAppSettings(){
         item.style.border='1px solid rgba(255,255,255,0.4)';
         item.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)';
       });
-      // Teks & icon gelap supaya terbaca
       document.querySelectorAll('.menu-label').forEach(el=>{el.style.color='#1e293b'});
       document.querySelectorAll('.menu-icon').forEach(el=>{el.style.background='rgba(13,148,136,0.15)'});
     }

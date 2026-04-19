@@ -348,12 +348,21 @@ a{color:inherit;text-decoration:none}
   text-align:center;
   border:1px solid var(--border);
   transition:box-shadow .2s;
+  position:relative;overflow:hidden;
 }
 .stat-card:hover{box-shadow:var(--shadow)}
 .stat-card .num{font-size:1.5rem;font-weight:800;color:var(--primary);letter-spacing:-.5px}
 .stat-card .label{font-size:.68rem;color:var(--text-muted);margin-top:.25rem;font-weight:500;text-transform:uppercase;letter-spacing:.3px}
-.stat-card.orange .num{color:var(--accent)}
-.stat-card.red .num{color:var(--red)}
+.stat-card .icon{position:absolute;right:8px;top:8px;font-size:1.8rem;opacity:.15}
+/* Warna stat cards */
+.stat-card.blue{background:linear-gradient(135deg,#e8f4fd,#fff);border-color:#b3d9f2}
+.stat-card.blue .num{color:#2196F3}
+.stat-card.green{background:linear-gradient(135deg,#e8f8e8,#fff);border-color:#a8d8a8}
+.stat-card.green .num{color:#4CAF50}
+.stat-card.orange{background:linear-gradient(135deg,#fff8e8,#fff);border-color:#f0d68a}
+.stat-card.orange .num{color:#FF9800}
+.stat-card.red{background:linear-gradient(135deg,#fdecea,#fff);border-color:#f0a8a8}
+.stat-card.red .num{color:#E53935}
 
 /* ============================
    TABLES
@@ -1197,10 +1206,10 @@ async function loadDashboard(){
     return;
   }
   $('statsContainer').innerHTML=
-    '<div class="stat-card"><div class="num">'+(d.total_santri||0)+'</div><div class="label">Total Santri</div></div>'+
-    '<div class="stat-card"><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
-    '<div class="stat-card orange"><div class="num">'+(d.izin_sakit||0)+'</div><div class="label">Izin/Sakit</div></div>'+
-    '<div class="stat-card red"><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
+    '<div class="stat-card blue"><span class="icon">👥</span><div class="num">'+(d.total_santri||0)+'</div><div class="label">Total Santri</div></div>'+
+    '<div class="stat-card green"><span class="icon">✅</span><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
+    '<div class="stat-card orange"><span class="icon">📝</span><div class="num">'+(d.izin_sakit||0)+'</div><div class="label">Izin/Sakit</div></div>'+
+    '<div class="stat-card red"><span class="icon">❌</span><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
   // Check notifications
   const ann=await api('/api/pengumuman');
   if(ann&&ann.length){
@@ -1732,7 +1741,7 @@ async function loadSensus(){
   santri.forEach(s=>{if(s.kamar_id&&kamarMap[s.kamar_id])kamarMap[s.kamar_id].count++});
   const total=santri.length;
   const aktif=santri.filter(s=>s.status==='aktif').length;
-  let html='<div class="stats"><div class="stat-card"><div class="num">'+total+'</div><div class="label">Total Santri</div></div><div class="stat-card"><div class="num">'+aktif+'</div><div class="label">Aktif</div></div><div class="stat-card orange"><div class="num">'+(total-aktif)+'</div><div class="label">Nonaktif/Lulus</div></div><div class="stat-card"><div class="num">'+kamar.length+'</div><div class="label">Total Kamar</div></div></div>';
+  let html='<div class="stats"><div class="stat-card blue"><span class="icon">👥</span><div class="num">'+total+'</div><div class="label">Total Santri</div></div><div class="stat-card green"><span class="icon">✅</span><div class="num">'+aktif+'</div><div class="label">Aktif</div></div><div class="stat-card orange"><span class="icon">📋</span><div class="num">'+(total-aktif)+'</div><div class="label">Nonaktif/Lulus</div></div><div class="stat-card blue"><span class="icon">🏠</span><div class="num">'+kamar.length+'</div><div class="label">Total Kamar</div></div></div>';
   html+='<div class="section-title">Per Kamar</div><div class="table-wrap"><table><thead><tr><th>Kamar</th><th>Jumlah Santri</th><th>Kapasitas</th></tr></thead><tbody>';
   kamar.forEach(k=>{
     const cap=k.kapasitas||0;
@@ -1747,10 +1756,10 @@ async function loadLaporan(){
   const d=await api('/api/dashboard');
   if(!d)return;
   $('laporanStats').innerHTML=
-    '<div class="stat-card"><div class="num">'+(d.total_santri||0)+'</div><div class="label">Total Santri</div></div>'+
-    '<div class="stat-card"><div class="num">'+(d.total_kamar||0)+'</div><div class="label">Total Kamar</div></div>'+
-    '<div class="stat-card"><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
-    '<div class="stat-card red"><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
+    '<div class="stat-card blue"><span class="icon">👥</span><div class="num">'+(d.total_santri||0)+'</div><div class="label">Total Santri</div></div>'+
+    '<div class="stat-card blue"><span class="icon">🏠</span><div class="num">'+(d.total_kamar||0)+'</div><div class="label">Total Kamar</div></div>'+
+    '<div class="stat-card green"><span class="icon">✅</span><div class="num">'+(d.hadir_hari_ini||0)+'</div><div class="label">Hadir Hari Ini</div></div>'+
+    '<div class="stat-card red"><span class="icon">❌</span><div class="num">'+(d.alfa||0)+'</div><div class="label">Alfa</div></div>';
 }
 
 // Rekap Ustadz
@@ -1765,9 +1774,9 @@ async function loadRekapUstadz(){
     return;
   }
   let html='<div class="stats">';
-  html+='<div class="stat-card"><div class="num">'+data.length+'</div><div class="label">Total Ustadz/Aktif</div></div>';
+  html+='<div class="stat-card blue"><span class="icon">👨‍🏫</span><div class="num">'+data.length+'</div><div class="label">Total Ustadz/Aktif</div></div>';
   const totalSesi=data.reduce((s,r)=>s+r.total_sesi,0);
-  html+='<div class="stat-card"><div class="num">'+totalSesi+'</div><div class="label">Total Sesi Mengajar</div></div>';
+  html+='<div class="stat-card green"><span class="icon">📚</span><div class="num">'+totalSesi+'</div><div class="label">Total Sesi Mengajar</div></div>';
   html+='</div>';
   data.forEach((u,idx)=>{
     html+='<div style="background:#fff;border-radius:14px;padding:1rem;margin-bottom:.8rem;box-shadow:var(--shadow)">';

@@ -551,68 +551,6 @@ app.delete('/api/catatan/:id', authenticate, (req, res) => {
   saveDB(db); res.json({ message: 'Catatan dihapus' });
 });
 
-// ── Raport Santri ───────────────────────────────────────
-app.get('/api/raport/:santri_id', authenticate, (req, res) => {
-  const santri = db.santri.find(s => s.id == req.params.santri_id);
-  if (!santri) return res.status(404).json({ message: 'Santri tidak ditemukan' });
-  const kamar = db.kamar.find(k => k.id === santri.kamar_id);
-  let absensiList = db.absensi.filter(a => a.santri_id === santri.id);
-  if (req.query.dari) absensiList = absensiList.filter(a => a.tanggal >= req.query.dari);
-  if (req.query.sampai) absensiList = absensiList.filter(a => a.tanggal <= req.query.sampai);
-  let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
-  if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
-  if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
-  let catatanList = (db.catatan_guru || []).filter(c => c.santri_id === santri.id);
-  if (req.query.dari) catatanList = catatanList.filter(c => c.tanggal >= req.query.dari);
-  if (req.query.sampai) catatanList = catatanList.filter(c => c.tanggal <= req.query.sampai);
-  // Group absensi by kegiatan - show ALL kegiatan
-  const rekap = {};
-  // Initialize all kegiatan with 0
-  db.kegiatan.forEach(k => {
-    rekap[k.nama] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
-  });
-  // Fill in actual data
-  absensiList.forEach(a => {
-    const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
-    const nama = kg ? kg.nama : 'Lainnya';
-    if (!rekap[nama]) rekap[nama] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
-    rekap[nama][a.status] = (rekap[nama][a.status] || 0) + 1;
-    rekap[nama].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
-  });
-  // Tambah Absen Malam dari tabel terpisah
-  let absenMalamList = (db.absen_malam || []).filter(a => a.santri_id === santri.id);
-  if (req.query.dari) absenMalamList = absenMalamList.filter(a => a.tanggal >= req.query.dari);
-  if (req.query.sampai) absenMalamList = absenMalamList.filter(a => a.tanggal <= req.query.sampai);
-  if (absenMalamList.length) {
-    rekap['Absen Malam'] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
-    absenMalamList.forEach(a => {
-      rekap['Absen Malam'][a.status] = (rekap['Absen Malam'][a.status] || 0) + 1;
-      rekap['Absen Malam'].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
-    });
-  }
-  // Tambah Absen Sekolah dari tabel terpisah
-  let absenSekolahList = (db.absen_sekolah || []).filter(a => a.santri_id === santri.id);
-  if (req.query.dari) absenSekolahList = absenSekolahList.filter(a => a.tanggal >= req.query.dari);
-  if (req.query.sampai) absenSekolahList = absenSekolahList.filter(a => a.tanggal <= req.query.sampai);
-  if (absenSekolahList.length) {
-    rekap['Sekolah Formal'] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
-    absenSekolahList.forEach(a => {
-      rekap['Sekolah Formal'][a.status] = (rekap['Sekolah Formal'][a.status] || 0) + 1;
-      rekap['Sekolah Formal'].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
-    });
-  }
-  res.json({
-    santri: { ...santri, kamar_nama: kamar ? kamar.nama : '-' },
-    periode: { dari: req.query.dari || '-', sampai: req.query.sampai || '-' },
-    rekap,
-    pelanggaran: pelanggaranList.sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
-    catatan_guru: catatanList.map(c => {
-      const u = db.users.find(x => x.id === c.created_by);
-      return { ...c, guru_nama: u ? u.nama : '-' };
-    }).sort((a, b) => b.tanggal.localeCompare(a.tanggal))
-  });
-});
-
 // ── Download All Raport (ZIP) ──────────────────────────
 app.get('/api/raport/download-all', authenticate, (req, res) => {
   const dataSettings = loadDB();
@@ -737,6 +675,68 @@ app.get('/api/raport/download-all', authenticate, (req, res) => {
     }
     archive.finalize();
   })();
+});
+
+// ── Raport Santri ───────────────────────────────────────
+app.get('/api/raport/:santri_id', authenticate, (req, res) => {
+  const santri = db.santri.find(s => s.id == req.params.santri_id);
+  if (!santri) return res.status(404).json({ message: 'Santri tidak ditemukan' });
+  const kamar = db.kamar.find(k => k.id === santri.kamar_id);
+  let absensiList = db.absensi.filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absensiList = absensiList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absensiList = absensiList.filter(a => a.tanggal <= req.query.sampai);
+  let pelanggaranList = (db.pelanggaran || []).filter(p => p.santri_id === santri.id);
+  if (req.query.dari) pelanggaranList = pelanggaranList.filter(p => p.tanggal >= req.query.dari);
+  if (req.query.sampai) pelanggaranList = pelanggaranList.filter(p => p.tanggal <= req.query.sampai);
+  let catatanList = (db.catatan_guru || []).filter(c => c.santri_id === santri.id);
+  if (req.query.dari) catatanList = catatanList.filter(c => c.tanggal >= req.query.dari);
+  if (req.query.sampai) catatanList = catatanList.filter(c => c.tanggal <= req.query.sampai);
+  // Group absensi by kegiatan - show ALL kegiatan
+  const rekap = {};
+  // Initialize all kegiatan with 0
+  db.kegiatan.forEach(k => {
+    rekap[k.nama] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+  });
+  // Fill in actual data
+  absensiList.forEach(a => {
+    const kg = db.kegiatan.find(k => k.id === a.kegiatan_id);
+    const nama = kg ? kg.nama : 'Lainnya';
+    if (!rekap[nama]) rekap[nama] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+    rekap[nama][a.status] = (rekap[nama][a.status] || 0) + 1;
+    rekap[nama].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
+  });
+  // Tambah Absen Malam dari tabel terpisah
+  let absenMalamList = (db.absen_malam || []).filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absenMalamList = absenMalamList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absenMalamList = absenMalamList.filter(a => a.tanggal <= req.query.sampai);
+  if (absenMalamList.length) {
+    rekap['Absen Malam'] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+    absenMalamList.forEach(a => {
+      rekap['Absen Malam'][a.status] = (rekap['Absen Malam'][a.status] || 0) + 1;
+      rekap['Absen Malam'].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
+    });
+  }
+  // Tambah Absen Sekolah dari tabel terpisah
+  let absenSekolahList = (db.absen_sekolah || []).filter(a => a.santri_id === santri.id);
+  if (req.query.dari) absenSekolahList = absenSekolahList.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) absenSekolahList = absenSekolahList.filter(a => a.tanggal <= req.query.sampai);
+  if (absenSekolahList.length) {
+    rekap['Sekolah Formal'] = { H: 0, I: 0, S: 0, A: 0, detail: [] };
+    absenSekolahList.forEach(a => {
+      rekap['Sekolah Formal'][a.status] = (rekap['Sekolah Formal'][a.status] || 0) + 1;
+      rekap['Sekolah Formal'].detail.push({ tanggal: a.tanggal, status: a.status, keterangan: a.keterangan });
+    });
+  }
+  res.json({
+    santri: { ...santri, kamar_nama: kamar ? kamar.nama : '-' },
+    periode: { dari: req.query.dari || '-', sampai: req.query.sampai || '-' },
+    rekap,
+    pelanggaran: pelanggaranList.sort((a, b) => b.tanggal.localeCompare(a.tanggal)),
+    catatan_guru: catatanList.map(c => {
+      const u = db.users.find(x => x.id === c.created_by);
+      return { ...c, guru_nama: u ? u.nama : '-' };
+    }).sort((a, b) => b.tanggal.localeCompare(a.tanggal))
+  });
 });
 
 // ── Export Raport PDF (4-Zone Layout) ───────────────────

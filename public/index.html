@@ -729,7 +729,7 @@ tr:hover{background:var(--bg)}
         <h3 class="section-title" style="margin:0">Kelola Kegiatan</h3>
         <button class="btn btn-primary btn-sm" onclick="showModal('kegiatan')">+ Tambah</button>
       </div>
-      <div class="table-wrap"><table><thead><tr><th>No</th><th>Nama Kegiatan</th><th>Aksi</th></tr></thead><tbody id="kegiatanBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>No</th><th>Nama Kegiatan</th><th>Kategori</th><th>Urutan</th><th>Aksi</th></tr></thead><tbody id="kegiatanBody"></tbody></table></div>
     </div>
 
     <!-- USERS -->
@@ -781,6 +781,7 @@ tr:hover{background:var(--bg)}
         <span style="color:var(--text-muted)">s/d</span>
         <input type="date" id="rekapUstadzSampai" style="padding:.5rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem">
         <button class="btn btn-primary btn-sm" onclick="loadRekapUstadz()">🔍 Filter</button>
+        <button class="btn btn-outline btn-sm" onclick="exportRekapUstadzPDF()">📥 PDF</button>
       </div>
       <div id="rekapUstadzContent"></div>
     </div>
@@ -1586,7 +1587,7 @@ function editUser(id){api('/api/users').then(data=>{const u=data.find(x=>x.id===
 async function loadKegiatan(){
   const data=await api('/api/kegiatan');
   if(!data)return;
-  $('kegiatanBody').innerHTML=data.map((k,i)=>'<tr><td>'+(i+1)+'</td><td>'+k.nama+'</td><td><button class="btn btn-sm btn-outline" onclick="showModal(\'kegiatan\',\''+encodeURIComponent(JSON.stringify(k))+'\')">✏️</button> <button class="btn btn-sm btn-danger" onclick="hapus(\'kegiatan\','+k.id+')">🗑️</button></td></tr>').join('')||'<tr><td colspan="3">Belum ada kegiatan</td></tr>';
+  $('kegiatanBody').innerHTML=data.map((k,i)=>'<tr><td>'+(i+1)+'</td><td>'+k.nama+'</td><td>'+(k.kategori==='pokok'?'📘 Pokok':'📙 Tambahan')+'</td><td>'+(k.urutan_tampil||0)+'</td><td><button class="btn btn-sm btn-outline" onclick="showModal(\'kegiatan\',\''+encodeURIComponent(JSON.stringify(k))+'\')">✏️</button> <button class="btn btn-sm btn-danger" onclick="hapus(\'kegiatan\','+k.id+')">🗑️</button></td></tr>').join('')||'<tr><td colspan="5">Belum ada kegiatan</td></tr>';
 }
 
 // Rekap - tab system like absensi
@@ -1785,6 +1786,13 @@ async function loadRekapUstadz(){
   $('rekapUstadzContent').innerHTML=html;
 }
 
+function exportRekapUstadzPDF(){
+  const params=new URLSearchParams();
+  if($('rekapUstadzDari').value)params.set('dari',$('rekapUstadzDari').value);
+  if($('rekapUstadzSampai').value)params.set('sampai',$('rekapUstadzSampai').value);
+  window.open('/api/rekap-ustadz/pdf?'+params.toString(),'_blank');
+}
+
 // Pengumuman
 async function loadPengumuman(){
   const data=await api('/api/pengumuman');
@@ -1841,7 +1849,7 @@ async function showModal(type,editData){
     let kd=null;
     if(editData&&typeof editData==='string')try{kd=JSON.parse(decodeURIComponent(editData))}catch(e){}
     else if(editData)kd=editData;
-    html='<h3>'+(kd?'Edit':'Tambah')+' Kegiatan</h3><div class="form-group"><label>Nama Kegiatan</label><input id="mNama" value="'+(kd?.nama||'')+'"></div><button class="btn btn-primary" onclick="saveKegiatan('+(kd?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
+    html='<h3>'+(kd?'Edit':'Tambah')+' Kegiatan</h3><div class="form-group"><label>Nama Kegiatan</label><input id="mNama" value="'+(kd?.nama||'')+'"></div><div class="form-group"><label>Kategori</label><select id="mKategori"><option value="pokok" '+(kd?.kategori==='pokok'?'selected':'')+'>Pokok</option><option value="tambahan" '+(kd?.kategori==='tambahan'?'selected':'')+'>Tambahan</option></select></div><div class="form-group"><label>Urutan Tampil</label><input type="number" id="mUrutanTampil" value="'+(kd?.urutan_tampil||0)+'" placeholder="0" style="width:80px"></div><button class="btn btn-primary" onclick="saveKegiatan('+(kd?.id||'')+')">Simpan</button><button class="btn btn-outline" onclick="closeModal()">Batal</button>';
     $('modalContent').innerHTML=html;$('modalBg').classList.add('active');
   }
 }
@@ -1890,7 +1898,7 @@ async function saveAnnounce(){
   toast(res.message||'Terkirim');closeModal();loadPengumuman();
 }
 async function saveKegiatan(id){
-  const body={nama:$('mNama').value};
+  const body={nama:$('mNama').value,kategori:$('mKategori').value,urutan_tampil:parseInt($('mUrutanTampil').value)||0};
   if(!body.nama)return toast('Nama wajib');
   const res=await api('/api/kegiatan'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(body)});
   toast(res.message||'Tersimpan');closeModal();loadKegiatan();

@@ -253,15 +253,17 @@ app.get('/api/kegiatan', authenticate, (req, res) => {
   res.json(db.kegiatan);
 });
 app.post('/api/kegiatan', authenticate, requireAdmin, (req, res) => {
-  const { nama } = req.body;
+  const { nama, kategori, urutan_tampil } = req.body;
   if (!nama) return res.status(400).json({ message: 'Nama kegiatan wajib' });
-  const k = { id: nextId(db.kegiatan), nama, created_at: new Date().toISOString() };
+  const k = { id: nextId(db.kegiatan), nama, kategori: kategori || 'pokok', urutan_tampil: urutan_tampil || 0, created_at: new Date().toISOString() };
   db.kegiatan.push(k); saveDB(db); res.json(k);
 });
 app.put('/api/kegiatan/:id', authenticate, requireAdmin, (req, res) => {
   const k = db.kegiatan.find(x => x.id == req.params.id);
   if (!k) return res.status(404).json({ message: 'Kegiatan tidak ditemukan' });
   if (req.body.nama) k.nama = req.body.nama;
+  if (req.body.kategori !== undefined) k.kategori = req.body.kategori;
+  if (req.body.urutan_tampil !== undefined) k.urutan_tampil = parseInt(req.body.urutan_tampil) || 0;
   saveDB(db); res.json({ message: 'Kegiatan diupdate' });
 });
 app.delete('/api/kegiatan/:id', authenticate, requireAdmin, (req, res) => {
@@ -1031,6 +1033,219 @@ app.get('/api/rekap-ustadz', authenticate, (req, res) => {
     };
   }).filter(r => r.total_sesi > 0 || !req.query.user_id);
   res.json(result.sort((a, b) => b.total_sesi - a.total_sesi));
+});
+
+// ── Rekap Ustadz PDF (Pivot Table) ──────────────────────
+app.get('/api/rekap-ustadz/pdf', authenticate, (req, res) => {
+  const dataSettings = loadDB();
+  const appName = (dataSettings.settings && dataSettings.settings.app_name) || 'Pesantren';
+  const kepalaNama = (dataSettings.settings && dataSettings.settings.kepala_nama) || '';
+  const alamatLembaga = (dataSettings.settings && dataSettings.settings.alamat_lembaga) || '';
+  const namaKota = (dataSettings.settings && dataSettings.settings.nama_kota) || '';
+  const logoData = (dataSettings.settings && dataSettings.settings.logo) || '';
+
+  // ── Filter sesi berdasarkan periode ──
+  if (!db.absensi_sesi) db.absensi_sesi = [];
+  let sesiList = db.absensi_sesi;
+  if (req.query.dari) sesiList = sesiList.filter(s => s.tanggal >= req.query.dari);
+  if (req.query.sampai) sesiList = sesiList.filter(s => s.tanggal <= req.query.sampai);
+
+  // ── BAGIAN 1: DETEKSI KEGIATAN AKTIF DI PERIODE INI ──
+  const kegiatanAktifSet = new Map(); // Map<id_or_nama, {nama, kategori, urutan}>
+  sesiList.forEach(s => {
+    let namaKeg = null, kategoriKeg = 'tambahan', urutanKeg = 0;
+    if (s.kegiatan_id && s.kegiatan_id > 0) {
+      const kg = db.kegiatan.find(k => k.id === s.kegiatan_id);
+      if (kg) {
+        namaKeg = kg.nama;
+        kategoriKeg = kg.kategori || 'tambahan';
+        urutanKeg = kg.urutan_tampil || 0;
+      }
+    } else if (s.kegiatan_nama) {
+      namaKeg = s.kegiatan_nama;
+      // Cek apakah ada di master kegiatan
+      const kg = db.kegiatan.find(k => k.nama === s.kegiatan_nama);
+      if (kg) {
+        kategoriKeg = kg.kategori || 'tambahan';
+        urutanKeg = kg.urutan_tampil || 0;
+      }
+    }
+    if (namaKeg && !kegiatanAktifSet.has(namaKeg)) {
+      kegiatanAktifSet.set(namaKeg, { nama: namaKeg, kategori: kategoriKeg, urutan: urutanKeg });
+    }
+  });
+
+  // ── BAGIAN 1.2: SORTING KOLOM (Pokok dulu, lalu Tambahan) ──
+  const kegiatanList = Array.from(kegiatanAktifSet.values()).sort((a, b) => {
+    if (a.kategori !== b.kategori) return a.kategori === 'pokok' ? -1 : 1;
+    return a.urutan - b.urutan;
+  });
+
+  // ── BAGIAN 1.3: GROUPING PER USTADZ ──
+  const users = db.users.filter(u => u.role !== 'wali');
+  const pivotData = users.map(u => {
+    const userSesi = sesiList.filter(s => s.ustadz_username === u.username);
+    if (userSesi.length === 0) return null;
+    const perKegiatan = {};
+    kegiatanList.forEach(k => { perKegiatan[k.nama] = 0; });
+    userSesi.forEach(s => {
+      let namaKeg = s.kegiatan_nama;
+      if (!namaKeg && s.kegiatan_id) {
+        const kg = db.kegiatan.find(k => k.id === s.kegiatan_id);
+        if (kg) namaKeg = kg.nama;
+      }
+      if (namaKeg && perKegiatan[namaKeg] !== undefined) perKegiatan[namaKeg]++;
+    });
+    return { nama: u.nama, per_kegiatan: perKegiatan, total: userSesi.length };
+  }).filter(Boolean).sort((a, b) => b.total - a.total);
+
+  if (pivotData.length === 0) {
+    return res.status(404).json({ message: 'Tidak ada data untuk periode ini' });
+  }
+
+  // ── BAGIAN 2: KOP SURAT (3 kolom: 15%-70%-15%) ──
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename=rekap-ustadz.pdf');
+  doc.pipe(res);
+
+  const pageW = 841.89; // A4 landscape width
+  const pageH = 595.28; // A4 landscape height
+  const M = 30;
+  const L = M, R = pageW - M, W = R - L;
+  let yy = M;
+  const logoW = W * 0.15;
+  const textW = W * 0.70;
+  const textX = L + logoW;
+
+  // Logo kiri
+  if (logoData && logoData.startsWith('data:')) {
+    try {
+      const base64 = logoData.split(',')[1];
+      const buf = Buffer.from(base64, 'base64');
+      doc.image(buf, L + 10, yy, { width: 50, height: 50 });
+    } catch (e) {}
+  }
+  // Teks tengah
+  doc.fontSize(14).font('Helvetica-Bold').text(appName, textX, yy, { width: textW, align: 'center' });
+  yy += 17;
+  doc.fontSize(11).font('Helvetica-Bold').text('REKAPITULASI KEHADIRAN MENGAJAR USTADZ', textX, yy, { width: textW, align: 'center' });
+  yy += 15;
+  doc.fontSize(8).font('Helvetica').text(alamatLembaga || '', textX, yy, { width: textW, align: 'center' });
+  yy += 16;
+  // Garis ganda
+  doc.moveTo(L, yy).lineTo(R, yy).lineWidth(1.5).stroke();
+  doc.moveTo(L, yy + 3).lineTo(R, yy + 3).lineWidth(0.5).stroke();
+  yy += 12;
+
+  // ── BAGIAN 2.2: SUB-HEADER PERIODE ──
+  const bulanNama = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const dariDate = req.query.dari ? new Date(req.query.dari) : new Date();
+  const sampaiDate = req.query.sampai ? new Date(req.query.sampai) : new Date();
+  const periodeLabel = 'Periode: ' + dariDate.getDate() + ' ' + bulanNama[dariDate.getMonth() + 1] + ' ' + dariDate.getFullYear() + ' - ' + sampaiDate.getDate() + ' ' + bulanNama[sampaiDate.getMonth() + 1] + ' ' + sampaiDate.getFullYear();
+  doc.fontSize(9).font('Helvetica').text(periodeLabel, L, yy, { width: W, align: 'center' });
+  yy += 18;
+
+  // ── BAGIAN 3: TABEL ELASTIS ──
+  const colNo = W * 0.05;
+  const colNama = W * 0.20;
+  const colTotal = W * 0.08;
+  const sisaW = W - colNo - colNama - colTotal;
+  const colKeg = kegiatanList.length > 0 ? sisaW / kegiatanList.length : sisaW;
+  const colWidths = [colNo, colNama, ...kegiatanList.map(() => colKeg), colTotal];
+  const headers = ['No', 'Nama Ustadz', ...kegiatanList.map(k => k.nama), 'Total'];
+
+  // Fungsi untuk render header tabel (repeat di halaman baru)
+  function renderTableHeader(yPos) {
+    const rowH = 28;
+    // Background header
+    doc.rect(L, yPos, W, rowH).fill('#f0f0f0').fillColor('#000');
+    // Border
+    doc.lineWidth(0.5).strokeColor('#333');
+    doc.rect(L, yPos, W, rowH).stroke();
+
+    let xx = L;
+    headers.forEach((h, i) => {
+      // Garis vertikal antar kolom
+      if (i > 0) doc.moveTo(xx, yPos).lineTo(xx, yPos + rowH).stroke();
+      // Cek apakah perlu rotate (jika kolom terlalu kecil)
+      if (i >= 2 && i < headers.length - 1 && colKeg < 35) {
+        // Rotate 90°
+        doc.save();
+        doc.translate(xx + colWidths[i] / 2, yPos + rowH / 2);
+        doc.rotate(-90);
+        doc.fontSize(7).font('Helvetica-Bold').text(h, -40, -3, { width: 80, align: 'center' });
+        doc.restore();
+      } else {
+        doc.fontSize(7).font('Helvetica-Bold').text(h, xx + 2, yPos + 4, {
+          width: colWidths[i] - 4, align: i === 1 ? 'left' : 'center', lineBreak: false
+        });
+      }
+      xx += colWidths[i];
+    });
+    return yPos + rowH;
+  }
+
+  yy = renderTableHeader(yy);
+
+  // ── BAGIAN 3.2: DATA ROWS ──
+  doc.font('Helvetica').fontSize(8);
+  pivotData.forEach((row, idx) => {
+    const rowH = 22;
+    // Check if need new page
+    if (yy + rowH > pageH - 80) {
+      doc.addPage();
+      yy = M;
+      // Repeat header
+      yy = renderTableHeader(yy);
+    }
+    // Alternating row color
+    if (idx % 2 === 0) {
+      doc.rect(L, yy, W, rowH).fill('#fafafa').fillColor('#000');
+    }
+    // Border
+    doc.lineWidth(0.3).strokeColor('#ccc');
+    doc.rect(L, yy, W, rowH).stroke();
+
+    let xx = L;
+    const rowData = [
+      String(idx + 1),
+      row.nama,
+      ...kegiatanList.map(k => {
+        const val = row.per_kegiatan[k.nama] || 0;
+        return val === 0 ? '-' : String(val);
+      }),
+      String(row.total)
+    ];
+    rowData.forEach((cell, i) => {
+      if (i > 0) doc.moveTo(xx, yy).lineTo(xx, yy + rowH).stroke();
+      doc.fontSize(8).font(i === 1 ? 'Helvetica' : 'Helvetica').text(cell, xx + 3, yy + 4, {
+        width: colWidths[i] - 6, align: i <= 1 ? (i === 0 ? 'center' : 'left') : 'center', lineBreak: false
+      });
+      xx += colWidths[i];
+    });
+    yy += rowH;
+  });
+
+  // ── BAGIAN 4: AREA PENANDA TANGANAN ──
+  yy += 20;
+  if (yy > pageH - 120) {
+    doc.addPage();
+    yy = M + 40;
+  }
+  const tglCetak = new Date();
+  const tglStr = (namaKota ? namaKota + ', ' : '') + tglCetak.getDate() + ' ' + bulanNama[tglCetak.getMonth() + 1] + ' ' + tglCetak.getFullYear();
+
+  // Tanda tangan di kanan
+  const signX = R - 200;
+  doc.fontSize(9).font('Helvetica').text(tglStr, signX, yy, { width: 200, align: 'center' });
+  yy += 14;
+  const jabatanDisplay = 'Kepala ' + appName;
+  doc.fontSize(9).font('Helvetica').text(jabatanDisplay, signX, yy, { width: 200, align: 'center' });
+  yy += 50;
+  doc.fontSize(9).font('Helvetica-Bold').text(kepalaNama || '......................................', signX, yy, { width: 200, align: 'center' });
+
+  doc.end();
 });
 
 app.listen(PORT, () => console.log(`Server jalan di http://localhost:${PORT}`));

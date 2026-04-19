@@ -920,6 +920,7 @@ tr:hover{background:var(--bg)}
         <div style="display:flex;gap:.5rem">
           <button class="btn btn-primary btn-sm" onclick="loadRaport()">Tampilkan</button>
           <button class="btn btn-outline btn-sm" onclick="exportRaportPDF()">📥 Export PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadAllRaport()">📦 Download Semua</button>
         </div>
       </div>
       <div id="raportContent"></div>
@@ -2182,6 +2183,18 @@ function exportRaportPDF(){
   const sampai=$('raportSampai').value||'';
   let url='/api/raport/'+sid+'/pdf?dari='+dari+'&sampai='+sampai;
   fetch(url,{headers:{'Authorization':'Bearer '+tkn}}).then(r=>{if(!r.ok)return r.json().then(e=>{throw new Error(e.message||'Gagal export PDF')});return r.blob()}).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='raport-santri.pdf';a.click()}).catch(e=>toast(e.message));
+}
+async function downloadAllRaport(){
+  toast('Mempersiapkan ZIP... mungkin butuh beberapa detik');
+  const tkn=localStorage.getItem('token');
+  const dari=$('raportDari').value||'';
+  const sampai=$('raportSampai').value||'';
+  const res=await fetch('/api/raport/download-all?dari='+dari+'&sampai='+sampai,{headers:{'Authorization':'Bearer '+tkn}});
+  if(!res.ok){try{const e=await res.json();toast(e.message||'Gagal download')}catch(_){toast('Gagal download')}return}
+  const blob=await res.blob();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='raport-semua-santri.zip';a.click();
+  URL.revokeObjectURL(a.href);
+  toast('ZIP berhasil di-download!');
 }
 
 // PDF Export

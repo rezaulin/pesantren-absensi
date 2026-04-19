@@ -1786,11 +1786,16 @@ async function loadRekapUstadz(){
   $('rekapUstadzContent').innerHTML=html;
 }
 
-function exportRekapUstadzPDF(){
+async function exportRekapUstadzPDF(){
   const params=new URLSearchParams();
   if($('rekapUstadzDari').value)params.set('dari',$('rekapUstadzDari').value);
   if($('rekapUstadzSampai').value)params.set('sampai',$('rekapUstadzSampai').value);
-  window.open('/api/rekap-ustadz/pdf?'+params.toString(),'_blank');
+  const res=await fetch('/api/rekap-ustadz/pdf?'+params.toString(),{headers:{'Authorization':'Bearer '+token}});
+  if(!res.ok){const e=await res.json();toast(e.message||'Gagal export');return}
+  const blob=await res.blob();
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='rekap-ustadz.pdf';a.click();
+  URL.revokeObjectURL(url);
 }
 
 // Pengumuman

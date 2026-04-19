@@ -6,6 +6,7 @@ const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const multer = require('multer');
 const archiver = require('archiver');
+const ExcelJS = require('exceljs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1112,6 +1113,184 @@ app.get('/api/export/pdf', authenticate, (req, res) => {
   doc.font('Helvetica').text(`Hadir: ${hadir} | Izin: ${izin} | Sakit: ${sakit} | Alfa: ${alfa} | Total: ${data.length}`, 40);
 
   doc.end();
+});
+
+// ── Export Rekap Absensi Excel ──────────────────────────
+app.get('/api/export/excel', authenticate, async (req, res) => {
+  const dataSettings = loadDB();
+  const appName = (dataSettings.settings && dataSettings.settings.app_name) || 'Pesantren';
+  const alamatLembaga = (dataSettings.settings && dataSettings.settings.alamat_lembaga) || '';
+  const logoData = (dataSettings.settings && dataSettings.settings.logo) || '';
+  const bulanNama = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+  // ── Ambil data rekap (sama seperti /api/export/pdf) ──
+  let list = db.absensi;
+  if (req.query.dari) list = list.filter(a => a.tanggal >= req.query.dari);
+  if (req.query.sampai) list = list.filter(a => a.tanggal <= req.query.sampai);
+  if (req.query.kegiatan_id) list = list.filter(a => a.kegiatan_id == req.query.kegiatan_id);
+  const santriFilters = ['kamar_id', 'kelas_diniyyah', 'kelompok_ngaji', 'kelompok_ngaji_malam', 'jenis_bakat', 'kelas_sekolah'];
+  santriFilters.forEach(f => {
+    if (req.query[f]) {
+      const santriIds = db.santri.filter(s => String(s[f]) === String(req.query[f])).map(s => s.id);
+      list = list.filter(a => santriIds.includes(a.santri_id));
+    }
+  });
+
+  // ── Pivot: per santri, per kegiatan, hitung H/I/S/A ──
+  const pivot = {};
+  const kegiatanSet = new Set();
+  list.forEach(a => {
+    const s = db.santri.find(x => x.id === a.santri_id);
+    if (!s) return;
+    const kg = db.kegiatan.find(x => x.id === a.kegiatan_id);
+    const namaKeg = kg ? kg.nama : 'Lainnya';
+    kegiatanSet.add(namaKeg);
+    if (!pivot[s.id]) pivot[s.id] = { nama: s.nama, kamar: '', data: {} };
+    const k = db.kamar.find(x => x.id === s.kamar_id);
+    pivot[s.id].kamar = k ? k.nama : '-';
+    if (!pivot[s.id].data[namaKeg]) pivot[s.id].data[namaKeg] = { H: 0, I: 0, S: 0, A: 0 };
+    pivot[s.id].data[namaKeg][a.status]++;
+  });
+
+  const kegiatanList = Array.from(kegiatanSet).sort();
+  const santriRows = Object.values(pivot).sort((a, b) => a.nama.localeCompare(b.nama));
+
+  // ── Buat Excel ──
+  const wb = new ExcelJS.Workbook();
+  wb.creator = appName;
+
+  // ── Sheet 1: Rekap Formal ──
+  const ws = wb.addWorksheet('Rekap Absensi', {
+    properties: { defaultColWidth: 12 }
+  });
+
+  // Logo (jika ada)
+  if (logoData && logoData.startsWith('data:')) {
+    try {
+      const base64 = logoData.split(',')[1];
+      const ext = logoData.split(';')[0].split('/')[1];
+      const imageId = wb.addImage({ base64, extension: ext === 'svg' ? 'png' : ext });
+      ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 60, height: 60 } });
+    } catch (e) {}
+  }
+
+  // ── KOP SURAT ──
+  ws.mergeCells('C1:J1');
+  ws.getCell('C1').value = appName;
+  ws.getCell('C1').font = { bold: true, size: 16 };
+  ws.getCell('C1').alignment = { horizontal: 'center' };
+
+  ws.mergeCells('C2:J2');
+  ws.getCell('C2').value = 'REKAPITULASI ABSENSI SANTRI';
+  ws.getCell('C2').font = { bold: true, size: 12 };
+  ws.getCell('C2').alignment = { horizontal: 'center' };
+
+  ws.mergeCells('C3:J3');
+  ws.getCell('C3').value = alamatLembaga;
+  ws.getCell('C3').font = { size: 10 };
+  ws.getCell('C3').alignment = { horizontal: 'center' };
+
+  // ── Periode ──
+  const dariDate = req.query.dari ? new Date(req.query.dari) : new Date();
+  const sampaiDate = req.query.sampai ? new Date(req.query.sampai) : new Date();
+  const periodeLabel = 'Periode: ' + dariDate.getDate() + ' ' + bulanNama[dariDate.getMonth() + 1] + ' ' + dariDate.getFullYear() + ' - ' + sampaiDate.getDate() + ' ' + bulanNama[sampaiDate.getMonth() + 1] + ' ' + sampaiDate.getFullYear();
+
+  ws.mergeCells('A5:J5');
+  ws.getCell('A5').value = periodeLabel;
+  ws.getCell('A5').font = { italic: true, size: 10 };
+  ws.getCell('A5').alignment = { horizontal: 'center' };
+
+  // ── Header tabel (baris 7) ──
+  const headerRow = 7;
+  const headers = ['No', 'Nama Santri', 'Kamar'];
+  kegiatanList.forEach(k => { headers.push(k); });
+  headers.push('Total H', 'Total I', 'Total S', 'Total A', 'Total');
+
+  const headerRowObj = ws.getRow(headerRow);
+  headers.forEach((h, i) => {
+    const cell = headerRowObj.getCell(i + 1);
+    cell.value = h;
+    cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E86C1' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin' }, bottom: { style: 'thin' },
+      left: { style: 'thin' }, right: { style: 'thin' }
+    };
+  });
+  headerRowObj.height = 25;
+
+  // ── Data rows ──
+  santriRows.forEach((s, idx) => {
+    const row = ws.getRow(headerRow + 1 + idx);
+    const r = idx + 1;
+    row.getCell(1).value = r;
+    row.getCell(1).alignment = { horizontal: 'center' };
+    row.getCell(2).value = s.nama;
+    row.getCell(3).value = s.kamar;
+
+    let totalH = 0, totalI = 0, totalS = 0, totalA = 0;
+    kegiatanList.forEach((k, ki) => {
+      const d = s.data[k] || { H: 0, I: 0, S: 0, A: 0 };
+      const total = d.H + d.I + d.S + d.A;
+      row.getCell(4 + ki).value = total;
+      row.getCell(4 + ki).alignment = { horizontal: 'center' };
+      totalH += d.H; totalI += d.I; totalS += d.S; totalA += d.A;
+    });
+
+    const colOffset = 4 + kegiatanList.length;
+    row.getCell(colOffset).value = totalH; row.getCell(colOffset).alignment = { horizontal: 'center' };
+    row.getCell(colOffset + 1).value = totalI; row.getCell(colOffset + 1).alignment = { horizontal: 'center' };
+    row.getCell(colOffset + 2).value = totalS; row.getCell(colOffset + 2).alignment = { horizontal: 'center' };
+    row.getCell(colOffset + 3).value = totalA; row.getCell(colOffset + 3).alignment = { horizontal: 'center' };
+    row.getCell(colOffset + 4).value = totalH + totalI + totalS + totalA;
+    row.getCell(colOffset + 4).alignment = { horizontal: 'center' };
+    row.getCell(colOffset + 4).font = { bold: true };
+
+    // Border semua sel
+    for (let c = 1; c <= headers.length; c++) {
+      row.getCell(c).border = {
+        top: { style: 'thin' }, bottom: { style: 'thin' },
+        left: { style: 'thin' }, right: { style: 'thin' }
+      };
+    }
+    // Alternating color
+    if (idx % 2 === 0) {
+      for (let c = 1; c <= headers.length; c++) {
+        row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+      }
+    }
+  });
+
+  // ── Sheet 2: Raw Data ──
+  const ws2 = wb.addWorksheet('Raw Data');
+  ws2.addRow(['Tanggal', 'Nama Santri', 'Kamar', 'Kegiatan', 'Status', 'Keterangan']);
+  const rawHeader = ws2.getRow(1);
+  rawHeader.font = { bold: true };
+  rawHeader.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E86C1' } };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  });
+
+  list.sort((a, b) => b.tanggal.localeCompare(a.tanggal)).forEach(a => {
+    const s = db.santri.find(x => x.id === a.santri_id);
+    const k = s ? db.kamar.find(x => x.id === s.kamar_id) : null;
+    const kg = db.kegiatan.find(x => x.id === a.kegiatan_id);
+    ws2.addRow([
+      a.tanggal,
+      s ? s.nama : '-',
+      k ? k.nama : '-',
+      kg ? kg.nama : '-',
+      a.status,
+      a.keterangan || ''
+    ]);
+  });
+
+  // ── Kirim file ──
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=rekap-absensi.xlsx');
+  await wb.xlsx.write(res);
+  res.end();
 });
 
 // ── Cleanup Orphan Absensi ─────────────────────────────

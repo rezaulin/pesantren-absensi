@@ -749,6 +749,7 @@ tr:hover{background:var(--bg)}
         <input type="date" id="rekapSampai">
         <button class="btn btn-primary btn-sm" onclick="loadRekap()">Filter</button>
         <button class="btn btn-outline btn-sm" onclick="exportPDF()">📥 PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="exportExcel()">📊 Excel</button>
       </div>
       <div class="kegiatan-tabs" id="rekapTabs"></div>
       <div id="rekapFilterArea" style="margin:.5rem 0;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
@@ -2197,7 +2198,22 @@ async function downloadAllRaport(){
   toast('ZIP berhasil di-download!');
 }
 
-// PDF Export
+// PDF & Excel Export
+async function exportExcel(){
+  const tkn=localStorage.getItem('token');
+  const dari=$('rekapDari')?.value||'';
+  const sampai=$('rekapSampai')?.value||'';
+  const kamar=$('rekapKamar')?.value||'';
+  let url='/api/export/excel?';
+  if(dari)url+='dari='+dari+'&';
+  if(sampai)url+='sampai='+sampai+'&';
+  if(kamar)url+='kamar_id='+kamar+'&';
+  const res=await fetch(url,{headers:{'Authorization':'Bearer '+tkn}});
+  if(!res.ok){try{const e=await res.json();toast(e.message||'Gagal export')}catch(_){toast('Gagal export')}return}
+  const blob=await res.blob();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='rekap-absensi.xlsx';a.click();
+  URL.revokeObjectURL(a.href);
+}
 function exportPDF(){
   const tkn=localStorage.getItem('token');
   const dari=$('rekapDari')?.value||'';
